@@ -1,0 +1,110 @@
+# Unity .gitignore
+
+# =============== #
+# Unity generated #
+# =============== #
+Temp/
+Obj/
+UnityGenerated/
+Library/
+Assets/AssetStoreTools*
+
+# ===================================== #
+# Visual Studio / MonoDevelop / Rider  #
+# ===================================== #
+ExportedObj/
+.consulo/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# ============ #
+# OS generated #
+# ============ #
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+ehthumbs.db
+Thumbs.db
+
+# ===== #
+# Builds #
+# ===== #
+Builds/
+Build/
+build/
+
+# =========== #
+# Packaged files #
+# =========== #
+*.unitypackage
+
+# ============= #
+# Crashlytics #
+# ============= #
+crashlytics-build.properties
+
+# ========== #
+# Compressed #
+# ========== #
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# ============ #
+# Logs #
+# ============ #
+Logs/
+*.log
+
+# ============ #
+# Rider #
+# ============ #
+.idea/
+
+# ============ #
+# TextMeshPro #
+# ============ #
+Assets/TextMesh Pro/
+
+# ============ #
+# Memory Captures #
+# ============ #
+MemoryCaptures/
+
+# ============ #
+# Recording #
+# ============ #
+Recordings/
+
+# ============ #
+# Plastic SCM #
+# ============ #
+.plastic/
+*.private
+
+# ============ #
+# Addressables #
+# ============ #
+Assets/AddressableAssetsData/*/*.bin*
+Assets/StreamingAssets/aa.meta
+Assets/StreamingAssets/aa/*
