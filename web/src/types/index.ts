@@ -516,6 +516,37 @@ export const DefaultMapLayout: Omit<TileData, 'position'>[] = [
   { index: 24, type: TileType.News, name: '新闻' },
   { index: 25, type: TileType.Property, name: '宜兰' },
   { index: 26, type: TileType.Property, name: '澎湖' },
+  { index: 27, type: TileType.Property, name: '连云港' },
+]
+
+export const MapTwoLayout: Omit<TileData, 'position'>[] = [
+  { index: 0, type: TileType.Start, name: '起点' },
+  { index: 1, type: TileType.Property, name: '上海' },
+  { index: 2, type: TileType.Property, name: '苏州' },
+  { index: 3, type: TileType.Shop, name: '道具店' },
+  { index: 4, type: TileType.Chance, name: '机会' },
+  { index: 5, type: TileType.Property, name: '南京' },
+  { index: 6, type: TileType.Bank, name: '银行' },
+  { index: 7, type: TileType.Property, name: '杭州' },
+  { index: 8, type: TileType.Tax, name: '税务局' },
+  { index: 9, type: TileType.Property, name: '合肥' },
+  { index: 10, type: TileType.Property, name: '宁波' },
+  { index: 11, type: TileType.News, name: '新闻' },
+  { index: 12, type: TileType.Property, name: '绍兴' },
+  { index: 13, type: TileType.Prison, name: '监狱' },
+  { index: 14, type: TileType.Property, name: '南通' },
+  { index: 15, type: TileType.Lottery, name: '彩票站' },
+  { index: 16, type: TileType.Property, name: '无锡' },
+  { index: 17, type: TileType.Hospital, name: '医院' },
+  { index: 18, type: TileType.Property, name: '常州' },
+  { index: 19, type: TileType.Fate, name: '命运' },
+  { index: 20, type: TileType.Park, name: '公园' },
+  { index: 21, type: TileType.Property, name: '嘉兴' },
+  { index: 22, type: TileType.Chance, name: '机会' },
+  { index: 23, type: TileType.Property, name: '扬州' },
+  { index: 24, type: TileType.Property, name: '镇江' },
+  { index: 25, type: TileType.Property, name: '徐州' },
+  { index: 26, type: TileType.Property, name: '盐城' },
   { index: 27, type: TileType.Chance, name: '机会' },
 ]
 
@@ -559,3 +590,46 @@ export const DefaultPropertyConfigs: Record<number, PropertyConfig> = {
   },
   26: { basePrice: 4000, baseRent: 400, region: PropertyRegion.Commercial },
 }
+
+export const MapTwoPropertyConfigs: Record<number, PropertyConfig> = {
+  1: DefaultPropertyConfigs[1],
+  2: DefaultPropertyConfigs[2],
+  5: DefaultPropertyConfigs[4],
+  7: DefaultPropertyConfigs[5],
+  9: DefaultPropertyConfigs[8],
+  10: DefaultPropertyConfigs[9],
+  12: DefaultPropertyConfigs[11],
+  14: DefaultPropertyConfigs[12],
+  16: DefaultPropertyConfigs[15],
+  18: DefaultPropertyConfigs[16],
+  21: DefaultPropertyConfigs[18],
+  23: DefaultPropertyConfigs[19],
+  24: DefaultPropertyConfigs[22],
+  25: DefaultPropertyConfigs[23],
+  26: DefaultPropertyConfigs[25],
+  27: DefaultPropertyConfigs[26],
+}
+
+export type MapId = 'map1' | 'map2'
+
+export interface MapDefinition {
+  id: MapId
+  name: string
+  layout: Omit<TileData, 'position'>[]
+  propertyConfigs: Record<number, PropertyConfig>
+}
+
+export const MapDefinitions: MapDefinition[] = [
+  {
+    id: 'map1',
+    name: '地图一',
+    layout: DefaultMapLayout,
+    propertyConfigs: DefaultPropertyConfigs,
+  },
+  {
+    id: 'map2',
+    name: '地图二',
+    layout: MapTwoLayout,
+    propertyConfigs: MapTwoPropertyConfigs,
+  },
+]

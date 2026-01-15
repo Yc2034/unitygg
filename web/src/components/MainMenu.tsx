@@ -4,7 +4,7 @@
 
 import { useState } from 'react'
 import { useGameStore, PlayerConfig } from '@/stores/gameStore'
-import { GameConstants } from '@/types'
+import { GameConstants, MapDefinitions, MapId } from '@/types'
 import xiaomeiImg from '@/assets/userimages/xiaomei.png'
 import shalaImg from '@/assets/userimages/shala.png'
 import beibeiImg from '@/assets/userimages/beibei.png'
@@ -46,6 +46,7 @@ export function MainMenu() {
   ])
   const [activePlayerIndex, setActivePlayerIndex] = useState(0)
   const [startingMoney, setStartingMoney] = useState(GameConstants.StartingMoney)
+  const [selectedMapId, setSelectedMapId] = useState<MapId>(MapDefinitions[0]?.id ?? 'map1')
 
   const activePlayer = playerConfigs[activePlayerIndex]
 
@@ -76,7 +77,7 @@ export function MainMenu() {
 
   // Start the game
   const handleStartGame = () => {
-    initGame(playerConfigs.slice(0, playerCount), startingMoney)
+    initGame(playerConfigs.slice(0, playerCount), startingMoney, selectedMapId)
     startGame()
   }
 
@@ -150,6 +151,27 @@ export function MainMenu() {
 
         <aside className="main-menu__panel" style={styles.controlsPanel}>
           <div style={styles.panelTitle}>游戏设置</div>
+
+          <div style={styles.controlBlock}>
+            <div style={styles.controlLabel}>地图</div>
+            <div style={styles.chipRow}>
+              {MapDefinitions.map((map) => (
+                <button
+                  key={map.id}
+                  type="button"
+                  className="menu-chip"
+                  data-active={selectedMapId === map.id}
+                  style={{
+                    ...styles.chip,
+                    ...(selectedMapId === map.id ? styles.chipActive : {}),
+                  }}
+                  onClick={() => setSelectedMapId(map.id)}
+                >
+                  {map.name}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div style={styles.controlBlock}>
             <div style={styles.controlLabel}>游戏人数</div>

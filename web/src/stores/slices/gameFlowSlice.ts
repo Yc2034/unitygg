@@ -13,10 +13,10 @@ import {
   CardData,
   DiceResult,
   GameConstants,
-  DefaultMapLayout,
-  DefaultPropertyConfigs,
   DefaultCards,
+  MapDefinitions,
 } from '@/types'
+import type { MapId, PropertyConfig } from '@/types'
 import { generateId, calculateBoardPositions } from '@/utils/helpers'
 import type { GameFlowSlice, SliceCreator, PlayerConfig } from './types'
 
@@ -45,17 +45,20 @@ function createPlayer(config: PlayerConfig, _index: number, startingMoney: numbe
   }
 }
 
-function createTiles(): TileData[] {
-  const positions = calculateBoardPositions(DefaultMapLayout.length)
-  return DefaultMapLayout.map((tile, index) => {
+function createTiles(
+  layout: Omit<TileData, 'position'>[],
+  propertyConfigs: Record<number, PropertyConfig>
+): TileData[] {
+  const positions = calculateBoardPositions(layout.length)
+  return layout.map((tile, index) => {
     const tileData: TileData = {
       ...tile,
       position: positions[index],
     }
 
     // Add property data if it's a property tile
-    if (tile.type === TileType.Property && DefaultPropertyConfigs[tile.index]) {
-      const config = DefaultPropertyConfigs[tile.index]
+    if (tile.type === TileType.Property && propertyConfigs[tile.index]) {
+      const config = propertyConfigs[tile.index]
       tileData.propertyData = {
         index: tile.index,
         name: tile.name,
@@ -73,6 +76,11 @@ function createTiles(): TileData[] {
 
     return tileData
   })
+}
+
+function getMapDefinition(mapId?: MapId) {
+  if (!mapId) return MapDefinitions[0]
+  return MapDefinitions.find((map) => map.id === mapId) ?? MapDefinitions[0]
 }
 
 function createRandomCard(): CardData {
@@ -94,7 +102,7 @@ export const createGameFlowSlice: SliceCreator<GameFlowSlice> = (set, get) => ({
 
   // ============ Game Flow Actions ============
 
-  initGame: (playerConfigs, startingMoney = GameConstants.StartingMoney) => {
+  initGame: (playerConfigs, startingMoney = GameConstants.StartingMoney, mapId) => {
     if (
       playerConfigs.length < GameConstants.MinPlayers ||
       playerConfigs.length > GameConstants.MaxPlayers
@@ -104,7 +112,8 @@ export const createGameFlowSlice: SliceCreator<GameFlowSlice> = (set, get) => ({
     }
 
     const players = playerConfigs.map((config, index) => createPlayer(config, index, startingMoney))
-    const tiles = createTiles()
+    const mapDefinition = getMapDefinition(mapId)
+    const tiles = createTiles(mapDefinition.layout, mapDefinition.propertyConfigs)
 
     // Give each player 2 random starting cards
     players.forEach((player) => {
@@ -123,7 +132,7 @@ export const createGameFlowSlice: SliceCreator<GameFlowSlice> = (set, get) => ({
       turnNumber: 0,
       roundNumber: 0,
       loans: [],
-      gameLog: ['游戏初始化完成'],
+      gameLog: [`游戏初始化完成 (${mapDefinition.name})`],
     })
   },
 

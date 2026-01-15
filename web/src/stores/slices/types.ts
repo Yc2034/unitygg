@@ -14,6 +14,7 @@ import type {
   SpecialEvent,
   SpecialEventEffect,
   PropertyFacility,
+  MapId,
 } from '@/types'
 
 // Player configuration for game initialization
@@ -85,7 +86,7 @@ export interface GameFlowSlice {
   forcedDiceValue: number | null
 
   // Actions
-  initGame: (playerConfigs: PlayerConfig[], startingMoney?: number) => void
+  initGame: (playerConfigs: PlayerConfig[], startingMoney?: number, mapId?: MapId) => void
   startGame: () => void
   pauseGame: () => void
   resumeGame: () => void
