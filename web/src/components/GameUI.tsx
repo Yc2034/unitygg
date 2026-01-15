@@ -3,10 +3,11 @@
  * Player info, dice, cards, and action buttons
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useGameStore } from '@/stores/gameStore'
 import { TurnState, PlayerState, TileType, GameState } from '@/types'
 import { formatCurrency, getPlayerColor } from '@/utils/helpers'
+import { aiController } from '@/game/AIController'
 
 export function GameUI() {
   const {
@@ -43,9 +44,40 @@ export function GameUI() {
   const [showShop, setShowShop] = useState(false)
   const [showEventModal, setShowEventModal] = useState(false)
   const [rentInfo, setRentInfo] = useState<{ amount: number; ownerName: string } | null>(null)
+  const aiRunningRef = useRef(false)
 
   const currentPlayer = getCurrentPlayer()
   const currentTile = currentPlayer ? tiles[currentPlayer.currentTileIndex] : null
+
+  // AI 控制器 - 当轮到 AI 玩家时自动执行
+  useEffect(() => {
+    if (
+      gameState === GameState.Playing &&
+      currentPlayer?.isAI &&
+      !aiRunningRef.current &&
+      (turnState === TurnState.WaitingForDice || turnState === TurnState.OnTile)
+    ) {
+      // 如果有事件弹窗，先等待关闭
+      if (showEventModal) return
+
+      aiRunningRef.current = true
+      aiController.executeAITurn().finally(() => {
+        aiRunningRef.current = false
+      })
+    }
+  }, [gameState, turnState, currentPlayer?.isAI, currentPlayer?.id, showEventModal])
+
+  // AI 自动关闭事件弹窗
+  useEffect(() => {
+    if (showEventModal && currentPlayer?.isAI) {
+      const timer = setTimeout(() => {
+        setShowEventModal(false)
+        setCurrentEvent(null)
+        setRentInfo(null)
+      }, 1500) // AI 1.5秒后自动关闭弹窗
+      return () => clearTimeout(timer)
+    }
+  }, [showEventModal, currentPlayer?.isAI])
 
   // 处理踩到格子时的事件
   useEffect(() => {
