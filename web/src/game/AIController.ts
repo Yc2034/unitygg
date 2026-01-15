@@ -70,6 +70,10 @@ export class AIController {
       case TurnState.OnTile:
         await this.handleOnTile(currentPlayer, config)
         break
+
+      case TurnState.ChoosingDirection:
+        await this.handleChoosingDirection()
+        break
     }
   }
 
@@ -189,6 +193,19 @@ export class AIController {
 
     await this.delay(500)
     store.endTurn()
+  }
+
+  private async handleChoosingDirection(): Promise<void> {
+    const store = useGameStore.getState()
+    const currentPlayer = store.getCurrentPlayer()
+    const pendingMove = store.pendingMove
+    if (!pendingMove || pendingMove.options.length === 0) return
+    if (pendingMove.playerId !== currentPlayer?.id) return
+
+    await this.delay(500)
+    const options = pendingMove.options
+    const choice = options[Math.floor(Math.random() * options.length)]
+    store.chooseMoveDirection(choice)
   }
 
   /**

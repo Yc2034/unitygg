@@ -15,6 +15,7 @@ import type {
   SpecialEventEffect,
   PropertyFacility,
   MapId,
+  PendingMove,
 } from '@/types'
 
 // Player configuration for game initialization
@@ -53,6 +54,7 @@ export interface BoardSlice {
   // State
   tiles: TileData[]
   boardSize: number
+  tileConnections: Record<number, number[]>
 
   // Actions
   purchaseProperty: (playerId: string, tileIndex: number) => boolean
@@ -149,6 +151,7 @@ export interface ActionSlice {
   actionQueue: GameAction[]
   currentAction: GameAction | null
   isProcessing: boolean
+  pendingMove: PendingMove | null
 
   // Queue Management
   pushAction: (action: GameAction) => void
@@ -165,6 +168,11 @@ export interface ActionSlice {
   createToJailAction: (playerId: string, turns?: number) => GameAction
   createToHospitalAction: (playerId: string, turns?: number) => GameAction
   createBankruptAction: (playerId: string) => GameAction
+
+  // Movement flow (branching)
+  startMove: (playerId: string, steps: number) => void
+  chooseMoveDirection: (nextIndex: number) => void
+  clearPendingMove: () => void
 }
 
 // ============ Combined Store Type ============

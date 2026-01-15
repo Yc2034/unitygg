@@ -3,14 +3,99 @@
  * 将游戏逻辑与渲染动画解耦
  */
 
-import { TileType, GameConstants, PlayerState, PropertyFacility } from '@/types'
+import { TileType, GameConstants, PlayerState, PropertyFacility, TurnState } from '@/types'
+import type { PendingMove } from '@/types'
 import type { ActionSlice, SliceCreator } from './types'
+
+type MoveBuildResult = {
+  path: number[]
+  passedStart: boolean
+  pendingMove: Omit<PendingMove, 'playerId'> | null
+}
+
+const getMoveOptions = (
+  connections: Record<number, number[]>,
+  currentIndex: number,
+  previousIndex: number | null
+) => {
+  const options = connections[currentIndex] ?? []
+  if (options.length <= 1) return options
+  if (previousIndex === null || previousIndex === undefined) return options
+  const forwardOptions = options.filter((index) => index !== previousIndex)
+  return forwardOptions.length > 0 ? forwardOptions : options
+}
+
+const buildMovePath = (
+  connections: Record<number, number[]>,
+  startIndex: number,
+  steps: number,
+  previousIndex: number | null,
+  options: {
+    forcedNextIndex?: number | null
+    allowChoice: boolean
+    hasPassedStart: boolean
+  }
+): MoveBuildResult => {
+  const path: number[] = []
+  let remainingSteps = steps
+  let currentIndex = startIndex
+  let currentPrevious = previousIndex
+  let passedStart = false
+  let forcedNextIndex = options.forcedNextIndex ?? null
+  let forcedUsed = false
+
+  while (remainingSteps > 0) {
+    const nextOptions = getMoveOptions(connections, currentIndex, currentPrevious)
+    if (nextOptions.length === 0) {
+      break
+    }
+
+    if (nextOptions.length > 1 && options.allowChoice && forcedNextIndex === null) {
+      return {
+        path,
+        passedStart,
+        pendingMove: {
+          currentIndex,
+          previousIndex: currentPrevious,
+          remainingSteps,
+          options: nextOptions,
+          hasPassedStart: options.hasPassedStart || passedStart,
+        },
+      }
+    }
+
+    let nextIndex: number
+    if (!forcedUsed && forcedNextIndex !== null) {
+      nextIndex = nextOptions.includes(forcedNextIndex) ? forcedNextIndex : nextOptions[0]
+      forcedUsed = true
+      forcedNextIndex = null
+    } else {
+      nextIndex = nextOptions[0]
+    }
+
+    path.push(nextIndex)
+    if (nextIndex === 0 && !options.hasPassedStart && !passedStart) {
+      passedStart = true
+    }
+
+    remainingSteps -= 1
+    currentPrevious = currentIndex
+    currentIndex = nextIndex
+  }
+
+  return {
+    path,
+    passedStart,
+    pendingMove: null,
+  }
+}
 
 export const createActionSlice: SliceCreator<ActionSlice> = (set, get) => ({
   // Initial state
   actionQueue: [],
   currentAction: null,
   isProcessing: false,
+  pendingMove: null,
 
   // ============ Queue Management ============
 
@@ -71,6 +156,7 @@ export const createActionSlice: SliceCreator<ActionSlice> = (set, get) => ({
       actionQueue: [],
       currentAction: null,
       isProcessing: false,
+      pendingMove: null,
     })
   },
 
@@ -83,6 +169,9 @@ export const createActionSlice: SliceCreator<ActionSlice> = (set, get) => ({
       case 'MOVE': {
         const { playerId, path, passedStart } = action
         const finalIndex = path[path.length - 1]
+        const player = get().getPlayer(playerId)
+        const startIndex = player?.currentTileIndex ?? finalIndex
+        const lastTileIndex = path.length > 1 ? path[path.length - 2] : startIndex
 
         // 更新玩家位置
         set((state) => ({
@@ -91,6 +180,7 @@ export const createActionSlice: SliceCreator<ActionSlice> = (set, get) => ({
             return {
               ...p,
               currentTileIndex: finalIndex,
+              lastTileIndex,
               money: passedStart ? p.money + GameConstants.SalaryOnPassStart : p.money,
               stats: passedStart
                 ? { ...p.stats, timesPassedStart: p.stats.timesPassedStart + 1 }
@@ -111,7 +201,7 @@ export const createActionSlice: SliceCreator<ActionSlice> = (set, get) => ({
 
         set((state) => ({
           players: state.players.map((p) =>
-            p.id === playerId ? { ...p, currentTileIndex: toIndex } : p
+            p.id === playerId ? { ...p, currentTileIndex: toIndex, lastTileIndex: null } : p
           ),
         }))
         break
@@ -128,6 +218,7 @@ export const createActionSlice: SliceCreator<ActionSlice> = (set, get) => ({
                   state: PlayerState.InJail,
                   turnsToSkip: turns,
                   currentTileIndex: jailIndex,
+                  lastTileIndex: null,
                 }
               : p
           ),
@@ -149,6 +240,7 @@ export const createActionSlice: SliceCreator<ActionSlice> = (set, get) => ({
                   state: PlayerState.InHospital,
                   turnsToSkip: turns,
                   currentTileIndex: hospitalIndex,
+                  lastTileIndex: null,
                 }
               : p
           ),
@@ -198,21 +290,16 @@ export const createActionSlice: SliceCreator<ActionSlice> = (set, get) => ({
   // ============ Action Creators ============
 
   createMoveAction: (playerId, startIndex, steps) => {
-    const { boardSize } = get()
-
-    // 计算路径
-    const path: number[] = []
-    let passedStart = false
-
-    for (let i = 1; i <= steps; i++) {
-      const nextIndex = (startIndex + i) % boardSize
-      path.push(nextIndex)
-
-      // 检查是否经过起点
-      if (startIndex + i >= boardSize && !passedStart) {
-        passedStart = true
-      }
-    }
+    const { tileConnections, getPlayer } = get()
+    const player = getPlayer(playerId)
+    const directionTarget = steps < 0 ? player?.lastTileIndex ?? null : null
+    const { path, passedStart } = buildMovePath(
+      tileConnections,
+      startIndex,
+      Math.abs(steps),
+      player?.lastTileIndex ?? null,
+      { allowChoice: false, hasPassedStart: false, forcedNextIndex: directionTarget }
+    )
 
     return {
       type: 'MOVE' as const,
@@ -258,6 +345,76 @@ export const createActionSlice: SliceCreator<ActionSlice> = (set, get) => ({
       hospitalIndex,
       turns,
     }
+  },
+
+  startMove: (playerId, steps) => {
+    const { getPlayer, tileConnections, pushAction, setTurnState } = get()
+    const player = getPlayer(playerId)
+    if (!player) return
+    set({ pendingMove: null })
+
+    const { path, passedStart, pendingMove } = buildMovePath(
+      tileConnections,
+      player.currentTileIndex,
+      steps,
+      player.lastTileIndex ?? null,
+      { allowChoice: true, hasPassedStart: false }
+    )
+
+    if (path.length > 0) {
+      pushAction({
+        type: 'MOVE' as const,
+        playerId,
+        path,
+        passedStart,
+      })
+    }
+
+    if (pendingMove) {
+      set({ pendingMove: { ...pendingMove, playerId } })
+      if (path.length === 0) {
+        setTurnState(TurnState.ChoosingDirection)
+      }
+    }
+  },
+
+  chooseMoveDirection: (nextIndex) => {
+    const { pendingMove, tileConnections, pushAction, setTurnState } = get()
+    if (!pendingMove) return
+
+    const { path, passedStart, pendingMove: nextPendingMove } = buildMovePath(
+      tileConnections,
+      pendingMove.currentIndex,
+      pendingMove.remainingSteps,
+      pendingMove.previousIndex,
+      {
+        forcedNextIndex: nextIndex,
+        allowChoice: true,
+        hasPassedStart: pendingMove.hasPassedStart,
+      }
+    )
+
+    set({ pendingMove: null })
+
+    if (path.length > 0) {
+      pushAction({
+        type: 'MOVE' as const,
+        playerId: pendingMove.playerId,
+        path,
+        passedStart,
+      })
+    }
+
+    if (nextPendingMove) {
+      set({ pendingMove: { ...nextPendingMove, playerId: pendingMove.playerId } })
+      if (path.length === 0) {
+        setTurnState(TurnState.ChoosingDirection)
+      }
+    }
+  },
+
+  clearPendingMove: () => {
+    set({ pendingMove: null })
   },
 
   createBankruptAction: (playerId) => {

@@ -39,6 +39,8 @@ export function GameUI() {
     calculateRent,
     getPropertyOwner,
     setPropertyFacility,
+    pendingMove,
+    chooseMoveDirection,
   } = useGameStore()
 
   const [selectedCard, setSelectedCard] = useState<string | null>(null)
@@ -66,7 +68,9 @@ export function GameUI() {
       gameState === GameState.Playing &&
       currentPlayer?.isAI &&
       !aiRunning &&
-      (turnState === TurnState.WaitingForDice || turnState === TurnState.OnTile)
+      (turnState === TurnState.WaitingForDice ||
+        turnState === TurnState.OnTile ||
+        turnState === TurnState.ChoosingDirection)
     ) {
       // 如果有事件弹窗，先等待关闭
       if (showEventModal) return
@@ -76,7 +80,15 @@ export function GameUI() {
         setAiRunning(false)
       })
     }
-  }, [gameState, turnState, currentPlayer?.isAI, currentPlayer?.id, showEventModal, aiRunning])
+  }, [
+    gameState,
+    turnState,
+    currentPlayer?.isAI,
+    currentPlayer?.id,
+    showEventModal,
+    aiRunning,
+    pendingMove?.currentIndex,
+  ])
 
   // AI 自动关闭事件弹窗
   useEffect(() => {
@@ -276,6 +288,10 @@ export function GameUI() {
     setRentInfo(null)
   }
 
+  const handleChooseDirection = (targetIndex: number) => {
+    chooseMoveDirection(targetIndex)
+  }
+
   // Handle card use
   const handleUseCard = () => {
     if (!currentPlayer || !selectedCard) return
@@ -369,6 +385,28 @@ export function GameUI() {
     return (
       <div style={styles.actionPanel}>
         <h3 style={styles.panelTitle}>行动</h3>
+
+        {turnState === TurnState.ChoosingDirection &&
+          pendingMove &&
+          pendingMove.playerId === currentPlayer?.id && (
+          <div style={styles.directionSection}>
+            <div style={styles.directionTitle}>选择前进方向</div>
+            <div style={styles.directionOptions}>
+              {pendingMove.options.map((targetIndex) => {
+                const tile = tiles.find((t) => t.index === targetIndex)
+                return (
+                  <button
+                    key={targetIndex}
+                    style={{ ...styles.button, ...styles.buttonSecondary }}
+                    onClick={() => handleChooseDirection(targetIndex)}
+                  >
+                    {tile?.name ?? `格子 ${targetIndex}`}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Dice */}
         <div style={styles.diceSection}>
@@ -763,6 +801,23 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '12px',
     marginBottom: '12px',
+  },
+  directionSection: {
+    marginBottom: '12px',
+    padding: '8px',
+    backgroundColor: '#0f1324',
+    borderRadius: '6px',
+    border: '1px solid #222',
+  },
+  directionTitle: {
+    fontSize: '12px',
+    color: '#ffe66d',
+    marginBottom: '6px',
+  },
+  directionOptions: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
   },
   diceResult: {
     fontSize: '24px',

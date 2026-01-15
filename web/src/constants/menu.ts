@@ -1,0 +1,1 @@
+export const STARTING_MONEY_OPTIONS = [30000, 50000, 100000] as const

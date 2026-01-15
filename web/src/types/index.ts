@@ -17,6 +17,7 @@ export enum TurnState {
   WaitingForDice = 'WaitingForDice',
   Rolling = 'Rolling',
   Moving = 'Moving',
+  ChoosingDirection = 'ChoosingDirection',
   OnTile = 'OnTile',
   UsingCard = 'UsingCard',
   TurnEnd = 'TurnEnd',
@@ -155,6 +156,7 @@ export interface PlayerData {
   money: number
   totalAssets: number
   currentTileIndex: number
+  lastTileIndex?: number | null
   state: PlayerState
   turnsToSkip: number
   ownedPropertyIndices: number[]
@@ -215,6 +217,15 @@ export interface DiceResult {
   values: number[]
   total: number
   isDoubles: boolean
+}
+
+export interface PendingMove {
+  playerId: string
+  currentIndex: number
+  previousIndex: number | null
+  remainingSteps: number
+  options: number[]
+  hasPassedStart: boolean
 }
 
 // ============ Event Types ============
@@ -516,39 +527,95 @@ export const DefaultMapLayout: Omit<TileData, 'position'>[] = [
   { index: 24, type: TileType.News, name: '新闻' },
   { index: 25, type: TileType.Property, name: '宜兰' },
   { index: 26, type: TileType.Property, name: '澎湖' },
-  { index: 27, type: TileType.Property, name: '连云港' },
+  { index: 27, type: TileType.Chance, name: '机会' },
 ]
 
 export const MapTwoLayout: Omit<TileData, 'position'>[] = [
   { index: 0, type: TileType.Start, name: '起点' },
   { index: 1, type: TileType.Property, name: '上海' },
   { index: 2, type: TileType.Property, name: '苏州' },
-  { index: 3, type: TileType.Shop, name: '道具店' },
-  { index: 4, type: TileType.Chance, name: '机会' },
-  { index: 5, type: TileType.Property, name: '南京' },
-  { index: 6, type: TileType.Bank, name: '银行' },
-  { index: 7, type: TileType.Property, name: '杭州' },
-  { index: 8, type: TileType.Tax, name: '税务局' },
+  { index: 3, type: TileType.Chance, name: '机会' },
+  { index: 4, type: TileType.Property, name: '南京' },
+  { index: 5, type: TileType.Property, name: '杭州' },
+  { index: 6, type: TileType.Tax, name: '税务局' },
+  { index: 7, type: TileType.Property, name: '宁波' },
+  { index: 8, type: TileType.Shop, name: '道具店' },
   { index: 9, type: TileType.Property, name: '合肥' },
-  { index: 10, type: TileType.Property, name: '宁波' },
+  { index: 10, type: TileType.Property, name: '岔路口' },
   { index: 11, type: TileType.News, name: '新闻' },
   { index: 12, type: TileType.Property, name: '绍兴' },
-  { index: 13, type: TileType.Prison, name: '监狱' },
-  { index: 14, type: TileType.Property, name: '南通' },
-  { index: 15, type: TileType.Lottery, name: '彩票站' },
-  { index: 16, type: TileType.Property, name: '无锡' },
-  { index: 17, type: TileType.Hospital, name: '医院' },
-  { index: 18, type: TileType.Property, name: '常州' },
-  { index: 19, type: TileType.Fate, name: '命运' },
+  { index: 13, type: TileType.Property, name: '南通' },
+  { index: 14, type: TileType.Hospital, name: '医院' },
+  { index: 15, type: TileType.Property, name: '无锡' },
+  { index: 16, type: TileType.Lottery, name: '彩票站' },
+  { index: 17, type: TileType.Property, name: '嘉兴' },
+  { index: 18, type: TileType.Bank, name: '银行' },
+  { index: 19, type: TileType.Property, name: '扬州' },
   { index: 20, type: TileType.Park, name: '公园' },
-  { index: 21, type: TileType.Property, name: '嘉兴' },
-  { index: 22, type: TileType.Chance, name: '机会' },
-  { index: 23, type: TileType.Property, name: '扬州' },
-  { index: 24, type: TileType.Property, name: '镇江' },
-  { index: 25, type: TileType.Property, name: '徐州' },
-  { index: 26, type: TileType.Property, name: '盐城' },
-  { index: 27, type: TileType.Chance, name: '机会' },
+  { index: 21, type: TileType.Fate, name: '命运' },
+  { index: 22, type: TileType.Property, name: '镇江' },
+  { index: 23, type: TileType.Property, name: '徐州' },
+  { index: 24, type: TileType.Chance, name: '机会' },
+  { index: 25, type: TileType.Property, name: '盐城' },
+  { index: 26, type: TileType.Property, name: '连云港' },
+  { index: 27, type: TileType.Property, name: '泰州' },
+  { index: 28, type: TileType.Property, name: '外环路' },
+  { index: 29, type: TileType.Property, name: '工业区' },
+  { index: 30, type: TileType.Prison, name: '监狱' },
 ]
+
+export const MapTwoGridPositions: Record<number, Position> = {
+  0: { x: 0, y: 7 },
+  1: { x: 1, y: 7 },
+  2: { x: 2, y: 7 },
+  3: { x: 3, y: 7 },
+  4: { x: 4, y: 7 },
+  5: { x: 5, y: 7 },
+  6: { x: 6, y: 7 },
+  7: { x: 7, y: 7 },
+  8: { x: 7, y: 6 },
+  9: { x: 7, y: 5 },
+  10: { x: 7, y: 4 },
+  11: { x: 7, y: 3 },
+  12: { x: 7, y: 2 },
+  13: { x: 7, y: 1 },
+  14: { x: 7, y: 0 },
+  15: { x: 6, y: 0 },
+  16: { x: 5, y: 0 },
+  17: { x: 4, y: 0 },
+  18: { x: 3, y: 0 },
+  19: { x: 2, y: 0 },
+  20: { x: 1, y: 0 },
+  21: { x: 0, y: 0 },
+  22: { x: 0, y: 1 },
+  23: { x: 0, y: 2 },
+  24: { x: 0, y: 3 },
+  25: { x: 0, y: 4 },
+  26: { x: 0, y: 5 },
+  27: { x: 0, y: 6 },
+  28: { x: 8, y: 4 },
+  29: { x: 9, y: 4 },
+  30: { x: 10, y: 4 },
+}
+
+const createRingConnections = (size: number): Record<number, number[]> => {
+  const connections: Record<number, number[]> = {}
+  for (let i = 0; i < size; i++) {
+    const prev = (i - 1 + size) % size
+    const next = (i + 1) % size
+    connections[i] = [prev, next]
+  }
+  return connections
+}
+
+export const MapTwoConnections: Record<number, number[]> = (() => {
+  const connections = createRingConnections(28)
+  connections[10] = [...connections[10], 28]
+  connections[28] = [10, 29]
+  connections[29] = [28, 30]
+  connections[30] = [29]
+  return connections
+})()
 
 // ============ Default Property Data ============
 
@@ -591,24 +658,36 @@ export const DefaultPropertyConfigs: Record<number, PropertyConfig> = {
   26: { basePrice: 4000, baseRent: 400, region: PropertyRegion.Commercial },
 }
 
-export const MapTwoPropertyConfigs: Record<number, PropertyConfig> = {
-  1: DefaultPropertyConfigs[1],
-  2: DefaultPropertyConfigs[2],
-  5: DefaultPropertyConfigs[4],
-  7: DefaultPropertyConfigs[5],
-  9: DefaultPropertyConfigs[8],
-  10: DefaultPropertyConfigs[9],
-  12: DefaultPropertyConfigs[11],
-  14: DefaultPropertyConfigs[12],
-  16: DefaultPropertyConfigs[15],
-  18: DefaultPropertyConfigs[16],
-  21: DefaultPropertyConfigs[18],
-  23: DefaultPropertyConfigs[19],
-  24: DefaultPropertyConfigs[22],
-  25: DefaultPropertyConfigs[23],
-  26: DefaultPropertyConfigs[25],
-  27: DefaultPropertyConfigs[26],
-}
+const MapTwoPropertyIndices = [
+  1, 2, 4, 5, 7, 9, 10, 12, 13, 15, 17, 19, 22, 23, 25, 26, 27, 28, 29,
+]
+
+const MapTwoPropertyBaseConfigs = [
+  DefaultPropertyConfigs[1],
+  DefaultPropertyConfigs[2],
+  DefaultPropertyConfigs[4],
+  DefaultPropertyConfigs[5],
+  DefaultPropertyConfigs[8],
+  DefaultPropertyConfigs[9],
+  DefaultPropertyConfigs[11],
+  DefaultPropertyConfigs[12],
+  DefaultPropertyConfigs[15],
+  DefaultPropertyConfigs[16],
+  DefaultPropertyConfigs[18],
+  DefaultPropertyConfigs[19],
+  DefaultPropertyConfigs[22],
+  DefaultPropertyConfigs[23],
+  DefaultPropertyConfigs[25],
+  DefaultPropertyConfigs[26],
+]
+
+export const MapTwoPropertyConfigs: Record<number, PropertyConfig> = MapTwoPropertyIndices.reduce(
+  (configs, tileIndex, configIndex) => {
+    configs[tileIndex] = MapTwoPropertyBaseConfigs[configIndex % MapTwoPropertyBaseConfigs.length]
+    return configs
+  },
+  {} as Record<number, PropertyConfig>
+)
 
 export type MapId = 'map1' | 'map2'
 
@@ -617,6 +696,9 @@ export interface MapDefinition {
   name: string
   layout: Omit<TileData, 'position'>[]
   propertyConfigs: Record<number, PropertyConfig>
+  gridPositions?: Record<number, Position>
+  connections?: Record<number, number[]>
+  startPrevIndex?: number
 }
 
 export const MapDefinitions: MapDefinition[] = [
@@ -625,11 +707,15 @@ export const MapDefinitions: MapDefinition[] = [
     name: '地图一',
     layout: DefaultMapLayout,
     propertyConfigs: DefaultPropertyConfigs,
+    startPrevIndex: DefaultMapLayout.length - 1,
   },
   {
     id: 'map2',
     name: '地图二',
     layout: MapTwoLayout,
     propertyConfigs: MapTwoPropertyConfigs,
+    gridPositions: MapTwoGridPositions,
+    connections: MapTwoConnections,
+    startPrevIndex: 27,
   },
 ]

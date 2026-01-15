@@ -98,6 +98,40 @@ export function calculateBoardPositions(tileCount: number): Position[] {
   }))
 }
 
+export function calculateBoardPositionsFromGrid(
+  gridPositions: Record<number, Position>
+): Record<number, Position> {
+  const isoPositions: Record<number, Position> = {}
+  let minX = Number.POSITIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+
+  Object.entries(gridPositions).forEach(([index, pos]) => {
+    const isoPos = gridToIso(pos.x, pos.y, BoardMetrics.tileWidth, BoardMetrics.tileHeight)
+    isoPositions[Number(index)] = isoPos
+    minX = Math.min(minX, isoPos.x)
+    maxX = Math.max(maxX, isoPos.x)
+    minY = Math.min(minY, isoPos.y)
+    maxY = Math.max(maxY, isoPos.y)
+  })
+
+  const centerX = (minX + maxX) / 2
+  const centerY = (minY + maxY) / 2
+  const offsetX = BoardMetrics.boardWidth / 2 - centerX
+  const offsetY = BoardMetrics.boardHeight / 2 - centerY + BoardMetrics.boardVerticalBias
+
+  const adjusted: Record<number, Position> = {}
+  Object.entries(isoPositions).forEach(([index, pos]) => {
+    adjusted[Number(index)] = {
+      x: pos.x + offsetX,
+      y: pos.y + offsetY,
+    }
+  })
+
+  return adjusted
+}
+
 /**
  * Delay execution
  */

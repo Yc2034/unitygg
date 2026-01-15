@@ -9,6 +9,7 @@ export const createBoardSlice: SliceCreator<BoardSlice> = (set, get) => ({
   // Initial state
   tiles: [],
   boardSize: GameConstants.DefaultBoardSize,
+  tileConnections: {},
 
   // ============ Property Actions ============
 

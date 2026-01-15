@@ -100,7 +100,8 @@ export const createEventSlice: SliceCreator<EventSlice> = (set, get) => ({
       getActivePlayers,
       setHasFreeUpgrade,
       addLog,
-      boardSize,
+      createMoveAction,
+      pushAction,
     } = get()
 
     const player = getPlayer(playerId)
@@ -120,8 +121,8 @@ export const createEventSlice: SliceCreator<EventSlice> = (set, get) => ({
         break
 
       case 'move':
-        const newIndex = (player.currentTileIndex + effect.steps + boardSize) % boardSize
-        teleportPlayer(playerId, newIndex)
+        const moveAction = createMoveAction(playerId, player.currentTileIndex, effect.steps)
+        pushAction(moveAction)
         break
 
       case 'teleport':

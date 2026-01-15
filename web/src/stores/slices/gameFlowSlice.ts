@@ -17,12 +17,17 @@ import {
   MapDefinitions,
 } from '@/types'
 import type { MapId, PropertyConfig } from '@/types'
-import { generateId, calculateBoardPositions } from '@/utils/helpers'
+import { generateId, calculateBoardPositions, calculateBoardPositionsFromGrid } from '@/utils/helpers'
 import type { GameFlowSlice, SliceCreator, PlayerConfig } from './types'
 
 // ============ Helper Functions ============
 
-function createPlayer(config: PlayerConfig, _index: number, startingMoney: number): PlayerData {
+function createPlayer(
+  config: PlayerConfig,
+  _index: number,
+  startingMoney: number,
+  startPrevIndex: number | null
+): PlayerData {
   return {
     id: generateId(),
     name: config.name,
@@ -30,6 +35,7 @@ function createPlayer(config: PlayerConfig, _index: number, startingMoney: numbe
     money: startingMoney,
     totalAssets: startingMoney,
     currentTileIndex: 0,
+    lastTileIndex: startPrevIndex,
     state: PlayerState.Normal,
     turnsToSkip: 0,
     ownedPropertyIndices: [],
@@ -47,13 +53,15 @@ function createPlayer(config: PlayerConfig, _index: number, startingMoney: numbe
 
 function createTiles(
   layout: Omit<TileData, 'position'>[],
-  propertyConfigs: Record<number, PropertyConfig>
+  propertyConfigs: Record<number, PropertyConfig>,
+  gridPositions?: Record<number, { x: number; y: number }>
 ): TileData[] {
-  const positions = calculateBoardPositions(layout.length)
+  const positionMap = gridPositions ? calculateBoardPositionsFromGrid(gridPositions) : null
+  const positions = gridPositions ? null : calculateBoardPositions(layout.length)
   return layout.map((tile, index) => {
     const tileData: TileData = {
       ...tile,
-      position: positions[index],
+      position: positionMap?.[tile.index] ?? positions?.[index] ?? { x: 0, y: 0 },
     }
 
     // Add property data if it's a property tile
@@ -81,6 +89,16 @@ function createTiles(
 function getMapDefinition(mapId?: MapId) {
   if (!mapId) return MapDefinitions[0]
   return MapDefinitions.find((map) => map.id === mapId) ?? MapDefinitions[0]
+}
+
+function createDefaultConnections(tileCount: number): Record<number, number[]> {
+  const connections: Record<number, number[]> = {}
+  for (let i = 0; i < tileCount; i++) {
+    const prev = (i - 1 + tileCount) % tileCount
+    const next = (i + 1) % tileCount
+    connections[i] = [prev, next]
+  }
+  return connections
 }
 
 function createRandomCard(): CardData {
@@ -111,9 +129,17 @@ export const createGameFlowSlice: SliceCreator<GameFlowSlice> = (set, get) => ({
       return
     }
 
-    const players = playerConfigs.map((config, index) => createPlayer(config, index, startingMoney))
     const mapDefinition = getMapDefinition(mapId)
-    const tiles = createTiles(mapDefinition.layout, mapDefinition.propertyConfigs)
+    const startPrevIndex = mapDefinition.startPrevIndex ?? mapDefinition.layout.length - 1
+    const players = playerConfigs.map((config, index) =>
+      createPlayer(config, index, startingMoney, startPrevIndex)
+    )
+    const tiles = createTiles(
+      mapDefinition.layout,
+      mapDefinition.propertyConfigs,
+      mapDefinition.gridPositions
+    )
+    const tileConnections = mapDefinition.connections ?? createDefaultConnections(tiles.length)
 
     // Give each player 2 random starting cards
     players.forEach((player) => {
@@ -127,6 +153,8 @@ export const createGameFlowSlice: SliceCreator<GameFlowSlice> = (set, get) => ({
       gameState: GameState.Loading,
       players,
       tiles,
+      boardSize: tiles.length,
+      tileConnections,
       shopCards,
       currentPlayerIndex: 0,
       turnNumber: 0,
@@ -166,7 +194,8 @@ export const createGameFlowSlice: SliceCreator<GameFlowSlice> = (set, get) => ({
   // ============ Turn System Actions ============
 
   startTurn: () => {
-    const { getCurrentPlayer, decrementSkipTurns, addLog, endTurn, nextPlayer, turnNumber } = get()
+    const { getCurrentPlayer, decrementSkipTurns, addLog, endTurn, nextPlayer, turnNumber, clearPendingMove } = get()
+    clearPendingMove()
     const player = getCurrentPlayer()
     if (!player) return
 
@@ -235,7 +264,7 @@ export const createGameFlowSlice: SliceCreator<GameFlowSlice> = (set, get) => ({
   // ============ Dice Actions ============
 
   rollDice: () => {
-    const { forcedDiceValue, addLog, getCurrentPlayer, createMoveAction, pushAction } = get()
+    const { forcedDiceValue, addLog, getCurrentPlayer, startMove } = get()
 
     let value: number
     if (forcedDiceValue !== null) {
@@ -259,8 +288,7 @@ export const createGameFlowSlice: SliceCreator<GameFlowSlice> = (set, get) => ({
     // 创建移动 Action 并推入队列
     const player = getCurrentPlayer()
     if (player) {
-      const moveAction = createMoveAction(player.id, player.currentTileIndex, value)
-      pushAction(moveAction)
+      startMove(player.id, value)
     }
 
     return result

@@ -48,6 +48,7 @@ export const createPlayerSlice: SliceCreator<PlayerSlice> = (set, get) => ({
         return {
           ...p,
           currentTileIndex: newIndex,
+          lastTileIndex: oldIndex,
           money: passedStart ? p.money + GameConstants.SalaryOnPassStart : p.money,
           stats: passedStart
             ? { ...p.stats, timesPassedStart: p.stats.timesPassedStart + 1 }
@@ -60,7 +61,7 @@ export const createPlayerSlice: SliceCreator<PlayerSlice> = (set, get) => ({
   teleportPlayer: (playerId, tileIndex) => {
     set((state) => ({
       players: state.players.map((p) =>
-        p.id === playerId ? { ...p, currentTileIndex: tileIndex } : p
+        p.id === playerId ? { ...p, currentTileIndex: tileIndex, lastTileIndex: null } : p
       ),
     }))
   },

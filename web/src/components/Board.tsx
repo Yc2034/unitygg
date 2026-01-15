@@ -710,7 +710,8 @@ export function Board() {
 
       // 动画完成，通知 Action Queue 执行状态更新并取下一个 Action
       completeAction()
-      setTurnState(TurnState.OnTile)
+      const hasPendingMove = !!useGameStore.getState().pendingMove
+      setTurnState(hasPendingMove ? TurnState.ChoosingDirection : TurnState.OnTile)
     }
 
     playAnimation()
