@@ -4,7 +4,7 @@
  */
 
 import { useGameStore } from '@/stores/gameStore'
-import { TileType, TurnState, GameState, GameConstants } from '@/types'
+import { TileType, TurnState, GameState, GameConstants, PropertyFacility } from '@/types'
 
 export interface AIDecision {
   action: 'roll' | 'purchase' | 'upgrade' | 'endTurn' | 'buyCard' | 'useCard'
@@ -98,7 +98,7 @@ export class AIController {
 
     // 处理地产格子
     if (currentTile.type === TileType.Property && currentTile.propertyData) {
-      const { ownerId, level } = currentTile.propertyData
+      const { ownerId, level, facilityType, resortEnabled } = currentTile.propertyData
       const price =
         currentTile.propertyData.basePrice *
         GameConstants.RegionMultipliers[currentTile.propertyData.region]
@@ -117,8 +117,17 @@ export class AIController {
         }
       }
 
+      // 自己的地产 - 选择酒店
+      if (ownerId === player.id && resortEnabled && facilityType === PropertyFacility.None) {
+        await this.delay(500)
+        store.setPropertyFacility(currentTile.index, PropertyFacility.Hotel)
+        await this.delay(500)
+        store.endTurn()
+        return
+      }
+
       // 自己的地产 - 考虑升级
-      if (ownerId === player.id && level < GameConstants.MaxPropertyLevel) {
+      if (!resortEnabled && ownerId === player.id && level < GameConstants.MaxPropertyLevel) {
         const upgradeCost = currentTile.propertyData.basePrice * level * 0.5
         const shouldUpgrade =
           player.money >= upgradeCost &&
@@ -153,7 +162,10 @@ export class AIController {
     // 处理免费升级机会
     if (store.hasFreeUpgrade) {
       const ownedProperties = store.tiles.filter(
-        (t) => t.propertyData?.ownerId === player.id && t.propertyData.level < 3
+        (t) =>
+          t.propertyData?.ownerId === player.id &&
+          t.propertyData.level < 3 &&
+          !t.propertyData.resortEnabled
       )
       if (ownedProperties.length > 0) {
         // 升级等级最低的地产

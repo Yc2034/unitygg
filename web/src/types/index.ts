@@ -53,6 +53,13 @@ export enum PropertyRegion {
   Luxury = 'Luxury',
 }
 
+export enum PropertyFacility {
+  None = 'None',
+  Park = 'Park',
+  Hotel = 'Hotel',
+  Mall = 'Mall',
+}
+
 // ============ Cards ============
 
 export enum CardType {
@@ -102,6 +109,8 @@ export const GameConstants = {
     2: 2.0, // Building
     3: 4.0, // Hotel
   } as Record<number, number>,
+  HotelRentPerDay: 1000,
+  MallRentPerDay: 2000,
 
   // Region price multipliers
   RegionMultipliers: {
@@ -172,6 +181,9 @@ export interface PropertyData {
   level: number
   ownerId: string | null
   isMortgaged: boolean
+  facilityType: PropertyFacility
+  resortEnabled: boolean
+  visualScale: number
 }
 
 export interface CardData {
@@ -509,14 +521,25 @@ export const DefaultMapLayout: Omit<TileData, 'position'>[] = [
 
 // ============ Default Property Data ============
 
-export const DefaultPropertyConfigs: Record<
-  number,
-  { basePrice: number; baseRent: number; region: PropertyRegion }
-> = {
+export interface PropertyConfig {
+  basePrice: number
+  baseRent: number
+  region: PropertyRegion
+  resortEnabled?: boolean
+  visualScale?: number
+}
+
+export const DefaultPropertyConfigs: Record<number, PropertyConfig> = {
   1: { basePrice: 2000, baseRent: 200, region: PropertyRegion.Suburb },
   2: { basePrice: 2000, baseRent: 200, region: PropertyRegion.Suburb },
   4: { basePrice: 2500, baseRent: 250, region: PropertyRegion.Suburb },
-  5: { basePrice: 2500, baseRent: 250, region: PropertyRegion.Suburb },
+  5: {
+    basePrice: 2500,
+    baseRent: 250,
+    region: PropertyRegion.Suburb,
+    resortEnabled: true,
+    visualScale: 2,
+  },
   8: { basePrice: 3000, baseRent: 300, region: PropertyRegion.Downtown },
   9: { basePrice: 3000, baseRent: 300, region: PropertyRegion.Downtown },
   11: { basePrice: 3500, baseRent: 350, region: PropertyRegion.Downtown },
@@ -527,6 +550,12 @@ export const DefaultPropertyConfigs: Record<
   19: { basePrice: 4500, baseRent: 450, region: PropertyRegion.Commercial },
   22: { basePrice: 3000, baseRent: 300, region: PropertyRegion.Suburb },
   23: { basePrice: 3500, baseRent: 350, region: PropertyRegion.Downtown },
-  25: { basePrice: 2500, baseRent: 250, region: PropertyRegion.Suburb },
+  25: {
+    basePrice: 2500,
+    baseRent: 250,
+    region: PropertyRegion.Suburb,
+    resortEnabled: true,
+    visualScale: 2,
+  },
   26: { basePrice: 4000, baseRent: 400, region: PropertyRegion.Commercial },
 }

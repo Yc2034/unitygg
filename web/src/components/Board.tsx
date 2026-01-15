@@ -6,7 +6,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import * as PIXI from 'pixi.js'
 import { useGameStore } from '@/stores/gameStore'
-import { TileType, TurnState, PlayerState } from '@/types'
+import { TileType, TurnState, PlayerState, PropertyFacility } from '@/types'
 import {
   BoardMetrics,
   clamp,
@@ -258,10 +258,15 @@ export function Board() {
       }
     )
 
-    const boardWidth = bounds.maxX - bounds.minX + TILE_WIDTH * 1.6
-    const boardHeight = bounds.maxY - bounds.minY + TILE_HEIGHT * 1.6
+    const maxVisualScale = tiles.reduce(
+      (max, tile) => Math.max(max, tile.propertyData?.visualScale ?? 1),
+      1
+    )
+    const boardWidth = bounds.maxX - bounds.minX + TILE_WIDTH * 1.6 * maxVisualScale
+    const boardHeight = bounds.maxY - bounds.minY + TILE_HEIGHT * 1.6 * maxVisualScale
     const boardCenterX = (bounds.minX + bounds.maxX) / 2
-    const boardCenterY = (bounds.minY + bounds.maxY) / 2 + TILE_HEIGHT * 0.1
+    const boardCenterY =
+      (bounds.minY + bounds.maxY) / 2 + TILE_HEIGHT * 0.1 * maxVisualScale
     boardCenterRef.current = { x: boardCenterX, y: boardCenterY }
     if (turnState !== TurnState.Moving) {
       cameraTargetRef.current.x = boardCenterX
@@ -300,6 +305,11 @@ export function Board() {
       tileContainer.y = tile.position.y
       tileContainer.zIndex = tile.position.y
 
+      const visualScale = tile.propertyData?.visualScale ?? 1
+      const tileWidth = TILE_WIDTH * visualScale
+      const tileHeight = TILE_HEIGHT * visualScale
+      const tileThickness = TILE_THICKNESS * (0.9 + 0.2 * visualScale)
+
       let baseColor = getTileColor(tile.type)
       if (tile.type === TileType.Property && tile.propertyData) {
         baseColor = getRegionColor(tile.propertyData.region)
@@ -311,7 +321,7 @@ export function Board() {
         right: darken(baseColor, 0.16),
         stroke: lighten(baseColor, 0.32),
       }
-      const tilePrism = createIsoPrism(TILE_WIDTH, TILE_HEIGHT, TILE_THICKNESS, tileColors, 'down')
+      const tilePrism = createIsoPrism(tileWidth, tileHeight, tileThickness, tileColors, 'down')
       tileContainer.addChild(tilePrism)
 
       const nameText = new PIXI.Text(tile.name, {
@@ -321,7 +331,7 @@ export function Board() {
       })
       nameText.anchor.set(0.5)
       nameText.x = 0
-      nameText.y = -TILE_HEIGHT * 0.15
+      nameText.y = -tileHeight * 0.15
       tileContainer.addChild(nameText)
 
       if (tile.type === TileType.Property && tile.propertyData) {
@@ -334,7 +344,7 @@ export function Board() {
           })
           priceText.anchor.set(0.5)
           priceText.x = 0
-          priceText.y = TILE_HEIGHT * 0.12
+          priceText.y = tileHeight * 0.12
           tileContainer.addChild(priceText)
         }
 
@@ -344,11 +354,11 @@ export function Board() {
           const building = new PIXI.Container()
           building.name = `${BUILDING_TAG}${tile.index}`
           building.x = tile.position.x
-          building.y = tile.position.y - TILE_HEIGHT * 0.18
+          building.y = tile.position.y - tileHeight * 0.18
           building.zIndex = tile.position.y + 1
 
-          const baseWidth = TILE_WIDTH * (0.36 + level * 0.05)
-          const baseHeight = TILE_HEIGHT * (0.36 + level * 0.05)
+          const baseWidth = tileWidth * (0.36 + level * 0.05)
+          const baseHeight = tileHeight * (0.36 + level * 0.05)
           const baseDepth = 14 + level * 10
           const buildingBase = lighten(baseColor, 0.2)
 
@@ -361,7 +371,7 @@ export function Board() {
 
           const shadow = new PIXI.Graphics()
           shadow.beginFill(0x000000, 0.18)
-          shadow.drawEllipse(0, TILE_HEIGHT * 0.22, baseWidth * 0.4, baseHeight * 0.2)
+          shadow.drawEllipse(0, tileHeight * 0.22, baseWidth * 0.4, baseHeight * 0.2)
           shadow.endFill()
           shadow.filters = [new PIXI.filters.BlurFilter(4)]
           building.addChild(shadow)
@@ -422,14 +432,32 @@ export function Board() {
 
           entitiesContainer.addChild(building)
         }
+
+        if (tile.propertyData.resortEnabled && tile.propertyData.facilityType !== PropertyFacility.None) {
+          const facilityLabel =
+            tile.propertyData.facilityType === PropertyFacility.Park
+              ? '公园'
+              : tile.propertyData.facilityType === PropertyFacility.Hotel
+                ? '酒店'
+                : '商场'
+          const facilityText = new PIXI.Text(facilityLabel, {
+            fontSize: 10,
+            fill: 0xf6f1d1,
+            fontWeight: 'bold',
+          })
+          facilityText.anchor.set(0.5)
+          facilityText.x = 0
+          facilityText.y = tileHeight * 0.28
+          tileContainer.addChild(facilityText)
+        }
       }
 
       const indexText = new PIXI.Text(`${tile.index}`, {
         fontSize: 8,
         fill: 0x9ea5b6,
       })
-      indexText.x = -TILE_WIDTH * 0.38
-      indexText.y = -TILE_HEIGHT * 0.1
+      indexText.x = -tileWidth * 0.38
+      indexText.y = -tileHeight * 0.1
       tileContainer.addChild(indexText)
 
       tilesContainer.addChild(tileContainer)

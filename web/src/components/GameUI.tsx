@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useGameStore } from '@/stores/gameStore'
-import { TurnState, PlayerState, TileType, GameState } from '@/types'
+import { TurnState, PlayerState, TileType, GameState, PropertyFacility, GameConstants } from '@/types'
 import { formatCurrency, getPlayerColor } from '@/utils/helpers'
 import { aiController } from '@/game/AIController'
 
@@ -33,10 +33,12 @@ export function GameUI() {
     getActivePlayers,
     handleTileEvent,
     payRent,
+    payResortFee,
     setCurrentEvent,
     setHasFreeUpgrade,
     calculateRent,
     getPropertyOwner,
+    setPropertyFacility,
   } = useGameStore()
 
   const [selectedCard, setSelectedCard] = useState<string | null>(null)
@@ -44,7 +46,16 @@ export function GameUI() {
   const [showShop, setShowShop] = useState(false)
   const [showEventModal, setShowEventModal] = useState(false)
   const [rentInfo, setRentInfo] = useState<{ amount: number; ownerName: string } | null>(null)
+  const [resortChoiceTileIndex, setResortChoiceTileIndex] = useState<number | null>(null)
+  const [resortResult, setResortResult] = useState<{
+    facility: PropertyFacility
+    roll?: number
+    amount?: number
+    ownerName?: string
+    stayTurns?: number
+  } | null>(null)
   const aiRunningRef = useRef(false)
+  const lastResolvedRef = useRef<string | null>(null)
 
   const currentPlayer = getCurrentPlayer()
   const currentTile = currentPlayer ? tiles[currentPlayer.currentTileIndex] : null
@@ -79,17 +90,32 @@ export function GameUI() {
     }
   }, [showEventModal, currentPlayer?.isAI])
 
+  useEffect(() => {
+    if (resortResult && currentPlayer?.isAI) {
+      const timer = setTimeout(() => {
+        setResortResult(null)
+      }, 1200)
+      return () => clearTimeout(timer)
+    }
+  }, [resortResult, currentPlayer?.isAI])
+
   // 处理踩到格子时的事件
   useEffect(() => {
     if (turnState !== TurnState.OnTile) {
       setRentInfo(null)
+      setResortChoiceTileIndex(null)
       return
     }
 
     if (!currentPlayer || !currentTile) {
       setRentInfo(null)
+      setResortChoiceTileIndex(null)
       return
     }
+
+    const resolveKey = `${turnNumber}:${currentPlayer.id}:${currentTile.index}`
+    if (lastResolvedRef.current === resolveKey) return
+    lastResolvedRef.current = resolveKey
 
     setRentInfo(null)
 
@@ -102,20 +128,82 @@ export function GameUI() {
     ) {
       handleTileEvent(currentPlayer.id, currentTile.index)
       setShowEventModal(true)
+      return
     }
 
-    // 处理他人地产租金
-    if (currentTile.type === TileType.Property && currentTile.propertyData) {
-      const owner = getPropertyOwner(currentTile.index)
-      if (owner && owner.id !== currentPlayer.id && !currentTile.propertyData.isMortgaged) {
-        const rent = calculateRent(currentTile.index)
-        if (rent > 0) {
-          setRentInfo({ amount: rent, ownerName: owner.name })
-          payRent(currentPlayer.id, currentTile.index)
+    // 处理地产逻辑
+    if (currentTile.type !== TileType.Property || !currentTile.propertyData) return
+
+    const owner = getPropertyOwner(currentTile.index)
+    const isOwner = owner?.id === currentPlayer.id
+    const facility = currentTile.propertyData.facilityType
+    const isResort = currentTile.propertyData.resortEnabled
+
+    if (isOwner) {
+      if (isResort && facility === PropertyFacility.None) {
+        if (currentPlayer.isAI) {
+          setPropertyFacility(currentTile.index, PropertyFacility.Hotel)
+        } else {
+          setResortChoiceTileIndex(currentTile.index)
         }
       }
+      return
     }
-  }, [turnState, currentPlayer?.currentTileIndex])
+
+    if (!owner || currentTile.propertyData.isMortgaged) return
+
+    if (isResort) {
+      if (facility === PropertyFacility.Park) {
+        setResortResult({ facility: PropertyFacility.Park })
+        return
+      }
+
+      if (facility === PropertyFacility.Hotel) {
+        const roll = Math.floor(Math.random() * 6) + 1
+        const amount = roll * GameConstants.HotelRentPerDay
+        payResortFee(currentPlayer.id, currentTile.index, amount, roll, PropertyFacility.Hotel)
+        setResortResult({
+          facility: PropertyFacility.Hotel,
+          roll,
+          amount,
+          ownerName: owner.name,
+          stayTurns: roll,
+        })
+        return
+      }
+
+      if (facility === PropertyFacility.Mall) {
+        const roll = Math.floor(Math.random() * 6) + 1
+        const amount = roll * GameConstants.MallRentPerDay
+        payResortFee(currentPlayer.id, currentTile.index, amount, 0, PropertyFacility.Mall)
+        setResortResult({
+          facility: PropertyFacility.Mall,
+          roll,
+          amount,
+          ownerName: owner.name,
+        })
+        return
+      }
+    }
+
+    const rent = calculateRent(currentTile.index)
+    if (rent > 0) {
+      setRentInfo({ amount: rent, ownerName: owner.name })
+      payRent(currentPlayer.id, currentTile.index)
+    }
+  }, [
+    turnState,
+    currentPlayer?.id,
+    currentPlayer?.isAI,
+    currentPlayer?.currentTileIndex,
+    turnNumber,
+    handleTileEvent,
+    getPropertyOwner,
+    calculateRent,
+    payRent,
+    payResortFee,
+    setPropertyFacility,
+  ])
 
   // Handle dice roll
   const handleRollDice = () => {
@@ -147,7 +235,8 @@ export function GameUI() {
     const ownedProperties = tiles.filter(
       (t) =>
         t.propertyData?.ownerId === currentPlayer.id &&
-        t.propertyData.level < 3
+        t.propertyData.level < 3 &&
+        !t.propertyData.resortEnabled
     )
     if (ownedProperties.length > 0) {
       // 升级第一个可升级的地产
@@ -168,6 +257,16 @@ export function GameUI() {
       }
     }
     setHasFreeUpgrade(false)
+  }
+
+  const handleSelectFacility = (facility: PropertyFacility) => {
+    if (resortChoiceTileIndex === null) return
+    setPropertyFacility(resortChoiceTileIndex, facility)
+    setResortChoiceTileIndex(null)
+  }
+
+  const handleCloseResortResult = () => {
+    setResortResult(null)
   }
 
   // Close event modal
@@ -264,7 +363,8 @@ export function GameUI() {
       currentTile?.type === TileType.Property &&
       currentTile.propertyData &&
       currentTile.propertyData.ownerId === currentPlayer.id &&
-      currentTile.propertyData.level < 3
+      currentTile.propertyData.level < 3 &&
+      !currentTile.propertyData.resortEnabled
 
     return (
       <div style={styles.actionPanel}>
@@ -317,7 +417,10 @@ export function GameUI() {
 
             {/* 免费升级按钮 */}
             {hasFreeUpgrade && currentPlayer && tiles.some(
-              (t) => t.propertyData?.ownerId === currentPlayer.id && t.propertyData.level < 3
+              (t) =>
+                t.propertyData?.ownerId === currentPlayer.id &&
+                t.propertyData.level < 3 &&
+                !t.propertyData.resortEnabled
             ) && (
               <button style={{ ...styles.button, ...styles.buttonWarning }} onClick={handleFreeUpgrade}>
                 使用免费升级
@@ -495,12 +598,107 @@ export function GameUI() {
     )
   }
 
+  const renderResortChoiceModal = () => {
+    if (resortChoiceTileIndex === null) return null
+    const tile = tiles.find((t) => t.index === resortChoiceTileIndex)
+    if (!tile?.propertyData) return null
+
+    return (
+      <div style={styles.modalOverlay}>
+        <div style={styles.modal}>
+          <div style={{ ...styles.modalHeader, backgroundColor: '#2f3a56' }}>
+            {tile.name} 选择经营
+          </div>
+          <div style={styles.modalBody}>
+            <div style={styles.eventDescription}>
+              请选择该地块的经营类型，影响其他玩家经过时的费用。
+            </div>
+            <div style={styles.resortOptions}>
+              <button
+                style={{ ...styles.button, ...styles.buttonSuccess }}
+                onClick={() => handleSelectFacility(PropertyFacility.Park)}
+              >
+                公园 (免租)
+              </button>
+              <button
+                style={{ ...styles.button, ...styles.buttonPrimary }}
+                onClick={() => handleSelectFacility(PropertyFacility.Hotel)}
+              >
+                酒店 (摇转盘入住)
+              </button>
+              <button
+                style={{ ...styles.button, ...styles.buttonWarning }}
+                onClick={() => handleSelectFacility(PropertyFacility.Mall)}
+              >
+                购物广场 (高价消费)
+              </button>
+              <button
+                style={{ ...styles.button, ...styles.buttonSecondary }}
+                onClick={() => setResortChoiceTileIndex(null)}
+              >
+                暂不选择
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const renderResortResultModal = () => {
+    if (!resortResult) return null
+
+    const headerColor =
+      resortResult.facility === PropertyFacility.Hotel
+        ? '#d35400'
+        : resortResult.facility === PropertyFacility.Mall
+          ? '#8e44ad'
+          : '#27ae60'
+
+    const title =
+      resortResult.facility === PropertyFacility.Hotel
+        ? '酒店入住'
+        : resortResult.facility === PropertyFacility.Mall
+          ? '购物广场'
+          : '公园'
+
+    const detail =
+      resortResult.facility === PropertyFacility.Park
+        ? '公园免租，本次不收取费用。'
+        : resortResult.facility === PropertyFacility.Hotel
+          ? `摇到 ${resortResult.roll}，向 ${resortResult.ownerName} 支付 ${formatCurrency(
+              resortResult.amount || 0
+            )}，入住 ${resortResult.stayTurns} 天。`
+          : `摇到 ${resortResult.roll}，向 ${resortResult.ownerName} 支付 ${formatCurrency(
+              resortResult.amount || 0
+            )}。`
+
+    return (
+      <div style={styles.modalOverlay}>
+        <div style={styles.modal}>
+          <div style={{ ...styles.modalHeader, backgroundColor: headerColor }}>{title}</div>
+          <div style={styles.modalBody}>
+            <div style={styles.eventTitle}>{detail}</div>
+          </div>
+          <button
+            style={{ ...styles.button, ...styles.buttonPrimary, width: '100%' }}
+            onClick={handleCloseResortResult}
+          >
+            确定
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={styles.container}>
       {renderPlayerInfo()}
       {renderActionPanel()}
       {renderGameLog()}
       {renderEventModal()}
+      {renderResortChoiceModal()}
+      {renderResortResultModal()}
     </div>
   )
 }
@@ -696,6 +894,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     textAlign: 'center',
     marginBottom: '8px',
+  },
+  resortOptions: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
   },
   modalOverlay: {
     position: 'fixed',

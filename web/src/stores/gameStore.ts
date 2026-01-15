@@ -17,6 +17,7 @@ import {
   LoanData,
   GameConstants,
   TileType,
+  PropertyFacility,
   DefaultMapLayout,
   DefaultPropertyConfigs,
   DefaultCards,
@@ -95,6 +96,7 @@ interface GameStore {
   redeemProperty: (tileIndex: number) => boolean
   calculateRent: (tileIndex: number) => number
   getPropertyOwner: (tileIndex: number) => PlayerData | null
+  setPropertyFacility: (tileIndex: number, facility: PropertyFacility) => void
 
   // Actions - Cards
   addCard: (playerId: string, card: CardData) => boolean
@@ -116,6 +118,13 @@ interface GameStore {
 
   // Actions - Rent
   payRent: (playerId: string, tileIndex: number) => boolean
+  payResortFee: (
+    playerId: string,
+    tileIndex: number,
+    amount: number,
+    stayTurns: number,
+    facility: PropertyFacility
+  ) => boolean
 
   // Current special event (for UI display)
   currentEvent: SpecialEvent | null
@@ -184,6 +193,9 @@ function createTiles(): TileData[] {
         level: 0,
         ownerId: null,
         isMortgaged: false,
+        facilityType: PropertyFacility.None,
+        resortEnabled: config.resortEnabled ?? false,
+        visualScale: config.visualScale ?? 1,
       }
     }
 
@@ -520,7 +532,12 @@ export const useGameStore = create<GameStore>()(
           t.propertyData?.ownerId === playerId
             ? {
                 ...t,
-                propertyData: { ...t.propertyData, ownerId: null, level: 0 },
+                propertyData: {
+                  ...t.propertyData,
+                  ownerId: null,
+                  level: 0,
+                  facilityType: PropertyFacility.None,
+                },
               }
             : t
         ),
@@ -687,8 +704,10 @@ export const useGameStore = create<GameStore>()(
       const tile = get().getTile(tileIndex)
       if (!tile?.propertyData) return 0
 
-      const { baseRent, level, region, isMortgaged } = tile.propertyData
+      const { baseRent, level, region, isMortgaged, facilityType, resortEnabled } =
+        tile.propertyData
       if (isMortgaged || level === 0) return 0
+      if (resortEnabled && facilityType !== PropertyFacility.None) return 0
 
       return (
         baseRent *
@@ -701,6 +720,33 @@ export const useGameStore = create<GameStore>()(
       const tile = get().getTile(tileIndex)
       if (!tile?.propertyData?.ownerId) return null
       return get().getPlayer(tile.propertyData.ownerId)
+    },
+
+    setPropertyFacility: (tileIndex, facility) => {
+      const tile = get().getTile(tileIndex)
+      if (!tile?.propertyData || !tile.propertyData.ownerId) return
+
+      set((state) => ({
+        tiles: state.tiles.map((t) =>
+          t.index === tileIndex
+            ? {
+                ...t,
+                propertyData: { ...t.propertyData!, facilityType: facility },
+              }
+            : t
+        ),
+      }))
+
+      const owner = get().getPlayer(tile.propertyData.ownerId)
+      const facilityName =
+        facility === PropertyFacility.Park
+          ? '公园'
+          : facility === PropertyFacility.Hotel
+            ? '酒店'
+            : facility === PropertyFacility.Mall
+              ? '购物广场'
+              : '空地'
+      get().addLog(`${owner?.name} 将 ${tile.name} 设置为 ${facilityName}`)
     },
 
     // ============ Card Actions ============
@@ -1113,6 +1159,66 @@ export const useGameStore = create<GameStore>()(
         get().setBankrupt(playerId)
         return false
       }
+    },
+
+    payResortFee: (playerId, tileIndex, amount, stayTurns, facility) => {
+      const tile = get().getTile(tileIndex)
+      const player = get().getPlayer(playerId)
+      if (!tile?.propertyData || !player) return false
+
+      const { ownerId, isMortgaged } = tile.propertyData
+      if (!ownerId || ownerId === playerId || isMortgaged) return false
+
+      const owner = get().getPlayer(ownerId)
+      if (!owner) return false
+
+      if (amount <= 0) return false
+
+      const facilityName =
+        facility === PropertyFacility.Hotel ? '酒店' : facility === PropertyFacility.Mall ? '购物广场' : '公园'
+
+      const applyStay = (turns: number) => {
+        if (turns <= 0) return
+        set((state) => ({
+          players: state.players.map((p) =>
+            p.id === playerId ? { ...p, turnsToSkip: p.turnsToSkip + turns } : p
+          ),
+        }))
+      }
+
+      if (player.money >= amount) {
+        get().transferMoney(playerId, ownerId, amount)
+        get().addLog(`${player.name} 在 ${tile.name}${facilityName} 支付 ${amount} 元`)
+        if (stayTurns > 0) {
+          applyStay(stayTurns)
+          get().addLog(`${player.name} 需要入住 ${stayTurns} 回合`)
+        }
+
+        set((state) => ({
+          players: state.players.map((p) => {
+            if (p.id === playerId) {
+              return { ...p, stats: { ...p.stats, totalRentPaid: p.stats.totalRentPaid + amount } }
+            }
+            if (p.id === ownerId) {
+              return {
+                ...p,
+                stats: { ...p.stats, totalRentReceived: p.stats.totalRentReceived + amount },
+              }
+            }
+            return p
+          }),
+        }))
+
+        return true
+      }
+
+      const actualPaid = player.money
+      if (actualPaid > 0) {
+        get().transferMoney(playerId, ownerId, actualPaid)
+        get().addLog(`${player.name} 无法支付全额费用，仅支付 ${actualPaid} 元`)
+      }
+      get().setBankrupt(playerId)
+      return false
     },
 
     // ============ Getters ============
