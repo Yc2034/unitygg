@@ -54,7 +54,7 @@ export function GameUI() {
     ownerName?: string
     stayTurns?: number
   } | null>(null)
-  const aiRunningRef = useRef(false)
+  const [aiRunning, setAiRunning] = useState(false)
   const lastResolvedRef = useRef<string | null>(null)
 
   const currentPlayer = getCurrentPlayer()
@@ -65,18 +65,18 @@ export function GameUI() {
     if (
       gameState === GameState.Playing &&
       currentPlayer?.isAI &&
-      !aiRunningRef.current &&
+      !aiRunning &&
       (turnState === TurnState.WaitingForDice || turnState === TurnState.OnTile)
     ) {
       // 如果有事件弹窗，先等待关闭
       if (showEventModal) return
 
-      aiRunningRef.current = true
+      setAiRunning(true)
       aiController.executeAITurn().finally(() => {
-        aiRunningRef.current = false
+        setAiRunning(false)
       })
     }
-  }, [gameState, turnState, currentPlayer?.isAI, currentPlayer?.id, showEventModal])
+  }, [gameState, turnState, currentPlayer?.isAI, currentPlayer?.id, showEventModal, aiRunning])
 
   // AI 自动关闭事件弹窗
   useEffect(() => {
