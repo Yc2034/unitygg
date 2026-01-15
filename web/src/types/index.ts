@@ -238,6 +238,181 @@ export interface GameEvent {
 
 // ============ Default Card Definitions ============
 
+// ============ Special Tile Events ============
+
+export interface SpecialEvent {
+  id: string
+  type: 'news' | 'lottery' | 'chance' | 'fate'
+  title: string
+  description: string
+  effect: SpecialEventEffect
+}
+
+export type SpecialEventEffect =
+  | { type: 'money'; amount: number } // 正数得钱，负数扣钱
+  | { type: 'move'; steps: number } // 正数前进，负数后退
+  | { type: 'teleport'; tileIndex: number } // 传送到指定格子
+  | { type: 'jail'; turns: number } // 入狱
+  | { type: 'hospital'; turns: number } // 住院
+  | { type: 'collectFromAll'; amount: number } // 从所有玩家收钱
+  | { type: 'payToAll'; amount: number } // 给所有玩家钱
+  | { type: 'freeUpgrade' } // 免费升级一次
+  | { type: 'skipTurn'; turns: number } // 跳过回合
+
+// 新闻事件 - 影响所有玩家
+export const NewsEvents: Omit<SpecialEvent, 'id'>[] = [
+  {
+    type: 'news',
+    title: '股市大涨',
+    description: '股市行情火爆，所有玩家获得 2000 元分红',
+    effect: { type: 'money', amount: 2000 },
+  },
+  {
+    type: 'news',
+    title: '经济衰退',
+    description: '经济不景气，所有玩家损失 1500 元',
+    effect: { type: 'money', amount: -1500 },
+  },
+  {
+    type: 'news',
+    title: '政府补贴',
+    description: '政府发放生活补贴，所有玩家获得 1000 元',
+    effect: { type: 'money', amount: 1000 },
+  },
+  {
+    type: 'news',
+    title: '通货膨胀',
+    description: '物价飞涨，所有玩家损失 800 元',
+    effect: { type: 'money', amount: -800 },
+  },
+]
+
+// 彩票事件 - 随机奖金
+export const LotteryEvents: Omit<SpecialEvent, 'id'>[] = [
+  {
+    type: 'lottery',
+    title: '头奖！',
+    description: '恭喜中头奖，获得 10000 元！',
+    effect: { type: 'money', amount: 10000 },
+  },
+  {
+    type: 'lottery',
+    title: '二等奖',
+    description: '中了二等奖，获得 5000 元',
+    effect: { type: 'money', amount: 5000 },
+  },
+  {
+    type: 'lottery',
+    title: '三等奖',
+    description: '中了三等奖，获得 2000 元',
+    effect: { type: 'money', amount: 2000 },
+  },
+  {
+    type: 'lottery',
+    title: '安慰奖',
+    description: '运气一般，获得 500 元安慰奖',
+    effect: { type: 'money', amount: 500 },
+  },
+  {
+    type: 'lottery',
+    title: '未中奖',
+    description: '很遗憾，没有中奖',
+    effect: { type: 'money', amount: 0 },
+  },
+]
+
+// 机会事件 - 通常是正面的
+export const ChanceEvents: Omit<SpecialEvent, 'id'>[] = [
+  {
+    type: 'chance',
+    title: '银行错误',
+    description: '银行出错，多给了你 3000 元',
+    effect: { type: 'money', amount: 3000 },
+  },
+  {
+    type: 'chance',
+    title: '股票分红',
+    description: '你的股票分红了，获得 2500 元',
+    effect: { type: 'money', amount: 2500 },
+  },
+  {
+    type: 'chance',
+    title: '生日礼物',
+    description: '今天是你的生日，每位玩家送你 500 元',
+    effect: { type: 'collectFromAll', amount: 500 },
+  },
+  {
+    type: 'chance',
+    title: '前进三步',
+    description: '获得一次额外移动机会，前进 3 步',
+    effect: { type: 'move', steps: 3 },
+  },
+  {
+    type: 'chance',
+    title: '免费升级',
+    description: '获得一次免费升级房产的机会',
+    effect: { type: 'freeUpgrade' },
+  },
+  {
+    type: 'chance',
+    title: '回到起点',
+    description: '传送回起点，并获得起点奖励',
+    effect: { type: 'teleport', tileIndex: 0 },
+  },
+]
+
+// 命运事件 - 可能正面也可能负面
+export const FateEvents: Omit<SpecialEvent, 'id'>[] = [
+  {
+    type: 'fate',
+    title: '被抢劫',
+    description: '在路上被抢劫，损失 2000 元',
+    effect: { type: 'money', amount: -2000 },
+  },
+  {
+    type: 'fate',
+    title: '医疗费用',
+    description: '生病住院，支付医疗费 1500 元',
+    effect: { type: 'money', amount: -1500 },
+  },
+  {
+    type: 'fate',
+    title: '交通事故',
+    description: '发生交通事故，住院休养 2 回合',
+    effect: { type: 'hospital', turns: 2 },
+  },
+  {
+    type: 'fate',
+    title: '入狱',
+    description: '违规被捕，入狱 2 回合',
+    effect: { type: 'jail', turns: 2 },
+  },
+  {
+    type: 'fate',
+    title: '慈善捐款',
+    description: '心情好想做慈善，给每位玩家 300 元',
+    effect: { type: 'payToAll', amount: 300 },
+  },
+  {
+    type: 'fate',
+    title: '后退三步',
+    description: '迷路了，后退 3 步',
+    effect: { type: 'move', steps: -3 },
+  },
+  {
+    type: 'fate',
+    title: '继承遗产',
+    description: '远房亲戚去世，继承遗产 5000 元',
+    effect: { type: 'money', amount: 5000 },
+  },
+  {
+    type: 'fate',
+    title: '税务审计',
+    description: '被税务局审计，补缴税款 3000 元',
+    effect: { type: 'money', amount: -3000 },
+  },
+]
+
 export const DefaultCards: Omit<CardData, 'id'>[] = [
   // Attack Cards
   {

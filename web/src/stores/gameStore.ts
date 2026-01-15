@@ -21,6 +21,12 @@ import {
   DefaultPropertyConfigs,
   DefaultCards,
   CardType,
+  SpecialEvent,
+  SpecialEventEffect,
+  NewsEvents,
+  LotteryEvents,
+  ChanceEvents,
+  FateEvents,
 } from '@/types'
 import { generateId, calculateBoardPositions } from '@/utils/helpers'
 
@@ -103,6 +109,19 @@ interface GameStore {
 
   // Actions - Log
   addLog: (message: string) => void
+
+  // Actions - Special Events
+  handleTileEvent: (playerId: string, tileIndex: number) => SpecialEvent | null
+  applyEventEffect: (playerId: string, effect: SpecialEventEffect) => void
+
+  // Actions - Rent
+  payRent: (playerId: string, tileIndex: number) => boolean
+
+  // Current special event (for UI display)
+  currentEvent: SpecialEvent | null
+  setCurrentEvent: (event: SpecialEvent | null) => void
+  hasFreeUpgrade: boolean
+  setHasFreeUpgrade: (value: boolean) => void
 
   // Getters
   getCurrentPlayer: () => PlayerData | null
@@ -198,6 +217,8 @@ export const useGameStore = create<GameStore>()(
     shopCards: [],
     loans: [],
     gameLog: [],
+    currentEvent: null,
+    hasFreeUpgrade: false,
 
     // ============ Game Flow Actions ============
 
@@ -913,6 +934,185 @@ export const useGameStore = create<GameStore>()(
       set((state) => ({
         gameLog: [...state.gameLog.slice(-99), message],
       }))
+    },
+
+    // ============ Special Events ============
+
+    setCurrentEvent: (event) => {
+      set({ currentEvent: event })
+    },
+
+    setHasFreeUpgrade: (value) => {
+      set({ hasFreeUpgrade: value })
+    },
+
+    handleTileEvent: (playerId, tileIndex) => {
+      const tile = get().getTile(tileIndex)
+      const player = get().getPlayer(playerId)
+      if (!tile || !player) return null
+
+      let events: Omit<SpecialEvent, 'id'>[] = []
+
+      switch (tile.type) {
+        case TileType.News:
+          events = NewsEvents
+          break
+        case TileType.Lottery:
+          events = LotteryEvents
+          break
+        case TileType.Chance:
+          events = ChanceEvents
+          break
+        case TileType.Fate:
+          events = FateEvents
+          break
+        default:
+          return null
+      }
+
+      // 随机选择一个事件
+      const randomEvent = events[Math.floor(Math.random() * events.length)]
+      const event: SpecialEvent = {
+        ...randomEvent,
+        id: generateId(),
+      }
+
+      get().addLog(`【${event.title}】${event.description}`)
+      get().setCurrentEvent(event)
+
+      // 新闻事件影响所有玩家
+      if (tile.type === TileType.News) {
+        get().getActivePlayers().forEach((p) => {
+          get().applyEventEffect(p.id, event.effect)
+        })
+      } else {
+        get().applyEventEffect(playerId, event.effect)
+      }
+
+      return event
+    },
+
+    applyEventEffect: (playerId, effect) => {
+      const player = get().getPlayer(playerId)
+      if (!player) return
+
+      switch (effect.type) {
+        case 'money':
+          if (effect.amount > 0) {
+            get().addMoney(playerId, effect.amount)
+          } else if (effect.amount < 0) {
+            const canPay = get().spendMoney(playerId, Math.abs(effect.amount))
+            if (!canPay) {
+              // 钱不够，破产
+              get().setBankrupt(playerId)
+            }
+          }
+          break
+
+        case 'move':
+          const { boardSize } = get()
+          const newIndex = (player.currentTileIndex + effect.steps + boardSize) % boardSize
+          get().teleportPlayer(playerId, newIndex)
+          break
+
+        case 'teleport':
+          get().teleportPlayer(playerId, effect.tileIndex)
+          // 如果传送到起点，给工资
+          if (effect.tileIndex === 0) {
+            get().addMoney(playerId, GameConstants.SalaryOnPassStart)
+            get().addLog(`${player.name} 获得起点奖励 ${GameConstants.SalaryOnPassStart} 元`)
+          }
+          break
+
+        case 'jail':
+          get().sendToJail(playerId, effect.turns)
+          break
+
+        case 'hospital':
+          get().sendToHospital(playerId, effect.turns)
+          break
+
+        case 'collectFromAll':
+          const activePlayers = get().getActivePlayers()
+          activePlayers.forEach((p) => {
+            if (p.id !== playerId) {
+              get().transferMoney(p.id, playerId, effect.amount)
+            }
+          })
+          break
+
+        case 'payToAll':
+          const allPlayers = get().getActivePlayers()
+          allPlayers.forEach((p) => {
+            if (p.id !== playerId) {
+              get().transferMoney(playerId, p.id, effect.amount)
+            }
+          })
+          break
+
+        case 'freeUpgrade':
+          get().setHasFreeUpgrade(true)
+          get().addLog(`${player.name} 获得一次免费升级机会`)
+          break
+
+        case 'skipTurn':
+          set((state) => ({
+            players: state.players.map((p) =>
+              p.id === playerId ? { ...p, turnsToSkip: p.turnsToSkip + effect.turns } : p
+            ),
+          }))
+          break
+      }
+    },
+
+    // ============ Rent Payment ============
+
+    payRent: (playerId, tileIndex) => {
+      const tile = get().getTile(tileIndex)
+      const player = get().getPlayer(playerId)
+
+      if (!tile?.propertyData || !player) return false
+
+      const { ownerId, isMortgaged } = tile.propertyData
+
+      // 检查是否是他人的地产且未抵押
+      if (!ownerId || ownerId === playerId || isMortgaged) return false
+
+      const owner = get().getPlayer(ownerId)
+      if (!owner) return false
+
+      const rent = get().calculateRent(tileIndex)
+      if (rent <= 0) return false
+
+      // 尝试支付租金
+      if (player.money >= rent) {
+        get().transferMoney(playerId, ownerId, rent)
+        get().addLog(`${player.name} 向 ${owner.name} 支付租金 ${rent} 元 (${tile.name})`)
+
+        // 更新统计
+        set((state) => ({
+          players: state.players.map((p) => {
+            if (p.id === playerId) {
+              return { ...p, stats: { ...p.stats, totalRentPaid: p.stats.totalRentPaid + rent } }
+            }
+            if (p.id === ownerId) {
+              return { ...p, stats: { ...p.stats, totalRentReceived: p.stats.totalRentReceived + rent } }
+            }
+            return p
+          }),
+        }))
+
+        return true
+      } else {
+        // 钱不够支付租金
+        const actualPaid = player.money
+        if (actualPaid > 0) {
+          get().transferMoney(playerId, ownerId, actualPaid)
+          get().addLog(`${player.name} 无法支付全额租金，仅支付 ${actualPaid} 元`)
+        }
+        get().setBankrupt(playerId)
+        return false
+      }
     },
 
     // ============ Getters ============
