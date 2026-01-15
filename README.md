@@ -67,29 +67,7 @@ npm run preview
 
 开发服务器启动后访问 http://localhost:5173
 
-## 项目结构
-
-```
-web/
-├── src/
-│   ├── types/          # 类型定义和游戏常量
-│   ├── stores/         # Zustand状态管理
-│   ├── components/     # React组件
-│   ├── utils/          # 工具函数
-│   └── game/           # 游戏核心逻辑(待扩展)
-├── package.json
-├── tsconfig.json
-└── vite.config.ts
-```
-
-## 开发命令
-
-```bash
-npm run dev      # 启动开发服务器
-npm run build    # 构建生产版本
-npm run preview  # 预览构建结果
-npm run lint     # 运行ESLint检查
-```
+https://richman.fandom.com/zh/wiki/%E5%A4%A7%E5%AF%8C%E7%BF%814
 
 ## 文档
 
