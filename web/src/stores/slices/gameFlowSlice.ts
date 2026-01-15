@@ -22,13 +22,13 @@ import type { GameFlowSlice, SliceCreator, PlayerConfig } from './types'
 
 // ============ Helper Functions ============
 
-function createPlayer(config: PlayerConfig, _index: number): PlayerData {
+function createPlayer(config: PlayerConfig, _index: number, startingMoney: number): PlayerData {
   return {
     id: generateId(),
     name: config.name,
     characterId: config.characterId,
-    money: GameConstants.StartingMoney,
-    totalAssets: GameConstants.StartingMoney,
+    money: startingMoney,
+    totalAssets: startingMoney,
     currentTileIndex: 0,
     state: PlayerState.Normal,
     turnsToSkip: 0,
@@ -94,7 +94,7 @@ export const createGameFlowSlice: SliceCreator<GameFlowSlice> = (set, get) => ({
 
   // ============ Game Flow Actions ============
 
-  initGame: (playerConfigs) => {
+  initGame: (playerConfigs, startingMoney = GameConstants.StartingMoney) => {
     if (
       playerConfigs.length < GameConstants.MinPlayers ||
       playerConfigs.length > GameConstants.MaxPlayers
@@ -103,7 +103,7 @@ export const createGameFlowSlice: SliceCreator<GameFlowSlice> = (set, get) => ({
       return
     }
 
-    const players = playerConfigs.map((config, index) => createPlayer(config, index))
+    const players = playerConfigs.map((config, index) => createPlayer(config, index, startingMoney))
     const tiles = createTiles()
 
     // Give each player 2 random starting cards

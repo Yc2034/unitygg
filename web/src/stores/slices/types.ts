@@ -85,7 +85,7 @@ export interface GameFlowSlice {
   forcedDiceValue: number | null
 
   // Actions
-  initGame: (playerConfigs: PlayerConfig[]) => void
+  initGame: (playerConfigs: PlayerConfig[], startingMoney?: number) => void
   startGame: () => void
   pauseGame: () => void
   resumeGame: () => void
