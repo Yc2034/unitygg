@@ -81,27 +81,37 @@ export function GameUI() {
 
   // 处理踩到格子时的事件
   useEffect(() => {
-    if (turnState === TurnState.OnTile && currentPlayer && currentTile) {
-      // 处理特殊格子事件
-      if (
-        currentTile.type === TileType.News ||
-        currentTile.type === TileType.Lottery ||
-        currentTile.type === TileType.Chance ||
-        currentTile.type === TileType.Fate
-      ) {
-        handleTileEvent(currentPlayer.id, currentTile.index)
-        setShowEventModal(true)
-      }
+    if (turnState !== TurnState.OnTile) {
+      setRentInfo(null)
+      return
+    }
 
-      // 处理他人地产租金
-      if (currentTile.type === TileType.Property && currentTile.propertyData) {
-        const owner = getPropertyOwner(currentTile.index)
-        if (owner && owner.id !== currentPlayer.id && !currentTile.propertyData.isMortgaged) {
-          const rent = calculateRent(currentTile.index)
-          if (rent > 0) {
-            setRentInfo({ amount: rent, ownerName: owner.name })
-            payRent(currentPlayer.id, currentTile.index)
-          }
+    if (!currentPlayer || !currentTile) {
+      setRentInfo(null)
+      return
+    }
+
+    setRentInfo(null)
+
+    // 处理特殊格子事件
+    if (
+      currentTile.type === TileType.News ||
+      currentTile.type === TileType.Lottery ||
+      currentTile.type === TileType.Chance ||
+      currentTile.type === TileType.Fate
+    ) {
+      handleTileEvent(currentPlayer.id, currentTile.index)
+      setShowEventModal(true)
+    }
+
+    // 处理他人地产租金
+    if (currentTile.type === TileType.Property && currentTile.propertyData) {
+      const owner = getPropertyOwner(currentTile.index)
+      if (owner && owner.id !== currentPlayer.id && !currentTile.propertyData.isMortgaged) {
+        const rent = calculateRent(currentTile.index)
+        if (rent > 0) {
+          setRentInfo({ amount: rent, ownerName: owner.name })
+          payRent(currentPlayer.id, currentTile.index)
         }
       }
     }

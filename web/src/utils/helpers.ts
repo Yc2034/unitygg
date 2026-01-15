@@ -4,6 +4,26 @@
 
 import { Position } from '@/types'
 
+export const BoardMetrics = {
+  boardWidth: 900,
+  boardHeight: 700,
+  tileWidth: 110,
+  tileHeight: 64,
+  boardVerticalBias: 24,
+} as const
+
+export function gridToIso(
+  gridX: number,
+  gridY: number,
+  tileWidth = BoardMetrics.tileWidth,
+  tileHeight = BoardMetrics.tileHeight
+): Position {
+  return {
+    x: (gridX - gridY) * (tileWidth / 2),
+    y: (gridX + gridY) * (tileHeight / 2),
+  }
+}
+
 /**
  * Generate a unique ID
  */
@@ -16,62 +36,66 @@ export function generateId(): string {
  * Board layout: rectangular path around the screen
  */
 export function calculateBoardPositions(tileCount: number): Position[] {
-  const positions: Position[] = []
-
-  // Board dimensions
-  const boardHeight = 600
-  const tileWidth = 80
-  const tileHeight = 80
-  const padding = 20
+  const gridPositions: Position[] = []
 
   // Calculate tiles per side
   // For 28 tiles: 8 per horizontal side, 6 per vertical side
   const tilesPerHorizontal = 8
   const tilesPerVertical = Math.floor((tileCount - 2 * tilesPerHorizontal) / 2) + 2
 
-  // Starting position (bottom-left corner)
-  const startX = padding
-  const startY = boardHeight - padding - tileHeight
-
   let index = 0
+  const gridMaxY = tilesPerVertical - 1
+  const gridMaxX = tilesPerHorizontal - 1
 
   // Bottom row (left to right)
   for (let i = 0; i < tilesPerHorizontal && index < tileCount; i++) {
-    positions.push({
-      x: startX + i * tileWidth,
-      y: startY,
-    })
+    gridPositions.push({ x: i, y: gridMaxY })
     index++
   }
 
   // Right column (bottom to top)
   for (let i = 1; i < tilesPerVertical && index < tileCount; i++) {
-    positions.push({
-      x: startX + (tilesPerHorizontal - 1) * tileWidth,
-      y: startY - i * tileHeight,
-    })
+    gridPositions.push({ x: gridMaxX, y: gridMaxY - i })
     index++
   }
 
   // Top row (right to left)
   for (let i = tilesPerHorizontal - 2; i >= 0 && index < tileCount; i--) {
-    positions.push({
-      x: startX + i * tileWidth,
-      y: startY - (tilesPerVertical - 1) * tileHeight,
-    })
+    gridPositions.push({ x: i, y: 0 })
     index++
   }
 
   // Left column (top to bottom, excluding corners)
   for (let i = tilesPerVertical - 2; i > 0 && index < tileCount; i--) {
-    positions.push({
-      x: startX,
-      y: startY - i * tileHeight,
-    })
+    gridPositions.push({ x: 0, y: i })
     index++
   }
 
-  return positions
+  const isoPositions = gridPositions.map((pos) =>
+    gridToIso(pos.x, pos.y, BoardMetrics.tileWidth, BoardMetrics.tileHeight)
+  )
+
+  let minX = Number.POSITIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+
+  isoPositions.forEach((pos) => {
+    minX = Math.min(minX, pos.x)
+    maxX = Math.max(maxX, pos.x)
+    minY = Math.min(minY, pos.y)
+    maxY = Math.max(maxY, pos.y)
+  })
+
+  const centerX = (minX + maxX) / 2
+  const centerY = (minY + maxY) / 2
+  const offsetX = BoardMetrics.boardWidth / 2 - centerX
+  const offsetY = BoardMetrics.boardHeight / 2 - centerY + BoardMetrics.boardVerticalBias
+
+  return isoPositions.map((pos) => ({
+    x: pos.x + offsetX,
+    y: pos.y + offsetY,
+  }))
 }
 
 /**
