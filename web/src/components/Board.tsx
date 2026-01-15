@@ -142,10 +142,11 @@ export function Board() {
   const players = useGameStore((state) => state.players)
   const currentPlayerIndex = useGameStore((state) => state.currentPlayerIndex)
   const turnState = useGameStore((state) => state.turnState)
-  const lastDiceResult = useGameStore((state) => state.lastDiceResult)
-  const movePlayer = useGameStore((state) => state.movePlayer)
   const setTurnState = useGameStore((state) => state.setTurnState)
-  const getCurrentPlayer = useGameStore((state) => state.getCurrentPlayer)
+
+  // Action Queue
+  const currentAction = useGameStore((state) => state.currentAction)
+  const completeAction = useGameStore((state) => state.completeAction)
 
   // Initialize Pixi Application
   useEffect(() => {
@@ -556,10 +557,10 @@ export function Board() {
     cameraTargetRef.current.zoom = CAMERA_IDLE_ZOOM
   }, [turnState])
 
-  // Handle player movement animation
+  // Handle player movement animation (步进式移动)
   const animateMovement = useCallback(
-    async (playerId: string, startIndex: number, steps: number) => {
-      if (!entitiesContainerRef.current || tiles.length === 0) return
+    async (playerId: string, path: number[]) => {
+      if (!entitiesContainerRef.current || tiles.length === 0 || path.length === 0) return
 
       const sprite = entitiesContainerRef.current.children.find(
         (child) => child.name === `${PLAYER_TAG}${playerId}`
@@ -569,8 +570,7 @@ export function Board() {
 
       const playerIndex = players.findIndex((p) => p.id === playerId)
 
-      for (let i = 1; i <= steps; i++) {
-        const targetIndex = (startIndex + i) % tiles.length
+      for (const targetIndex of path) {
         const anchor = getPlayerAnchor(targetIndex, playerIndex)
         const targetX = anchor.x
         const targetY = anchor.y
@@ -615,23 +615,106 @@ export function Board() {
     [tiles, players, currentPlayerIndex, getPlayerAnchor]
   )
 
-  // Listen for dice roll and trigger movement
+  // Handle teleport animation (瞬移带闪烁效果)
+  const animateTeleport = useCallback(
+    async (playerId: string, _fromIndex: number, toIndex: number) => {
+      if (!entitiesContainerRef.current || tiles.length === 0) return
+
+      const sprite = entitiesContainerRef.current.children.find(
+        (child) => child.name === `${PLAYER_TAG}${playerId}`
+      ) as PIXI.Container | undefined
+
+      if (!sprite) return
+
+      const playerIndex = players.findIndex((p) => p.id === playerId)
+      const anchor = getPlayerAnchor(toIndex, playerIndex)
+
+      // 消失动画
+      const fadeOutDuration = 150
+      const fadeOutStart = Date.now()
+      while (Date.now() - fadeOutStart < fadeOutDuration) {
+        const progress = (Date.now() - fadeOutStart) / fadeOutDuration
+        sprite.alpha = 1 - progress
+        sprite.scale.set(sprite.scale.x * (1 - progress * 0.02))
+        await delay(16)
+      }
+
+      // 移动到目标位置
+      sprite.x = anchor.x
+      sprite.y = anchor.y
+      sprite.zIndex = sprite.y + 2
+      const targetScale = getDepthScale(anchor.y, playerIndex === currentPlayerIndex)
+      sprite.scale.set(targetScale)
+
+      // 更新相机
+      cameraTargetRef.current.x = anchor.x
+      cameraTargetRef.current.y = anchor.y - TILE_HEIGHT * 0.2
+      cameraTargetRef.current.zoom = CAMERA_MOVE_ZOOM
+
+      // 出现动画
+      const fadeInDuration = 200
+      const fadeInStart = Date.now()
+      while (Date.now() - fadeInStart < fadeInDuration) {
+        const progress = (Date.now() - fadeInStart) / fadeInDuration
+        sprite.alpha = progress
+        await delay(16)
+      }
+
+      sprite.alpha = 1
+      cameraTargetRef.current.zoom = CAMERA_IDLE_ZOOM
+    },
+    [tiles, players, currentPlayerIndex, getPlayerAnchor]
+  )
+
+  // Handle jail/hospital animation (特殊传送)
+  const animateSpecialTeleport = useCallback(
+    async (playerId: string, toIndex: number) => {
+      // 使用与普通传送相同的动画，但可以在未来添加特殊效果
+      await animateTeleport(playerId, 0, toIndex)
+    },
+    [animateTeleport]
+  )
+
+  // Listen for currentAction and play corresponding animation
   useEffect(() => {
-    if (turnState === TurnState.Rolling && lastDiceResult) {
-      const currentPlayer = getCurrentPlayer()
-      if (!currentPlayer) return
+    if (!currentAction) return
 
-      const startIndex = currentPlayer.currentTileIndex
-      const steps = lastDiceResult.total
-
+    const playAnimation = async () => {
       setTurnState(TurnState.Moving)
 
-      animateMovement(currentPlayer.id, startIndex, steps).then(() => {
-        movePlayer(currentPlayer.id, steps)
-        setTurnState(TurnState.OnTile)
-      })
+      switch (currentAction.type) {
+        case 'MOVE':
+          await animateMovement(currentAction.playerId, currentAction.path)
+          break
+
+        case 'TELEPORT':
+          await animateTeleport(
+            currentAction.playerId,
+            currentAction.fromIndex,
+            currentAction.toIndex
+          )
+          break
+
+        case 'TO_JAIL':
+          await animateSpecialTeleport(currentAction.playerId, currentAction.jailIndex)
+          break
+
+        case 'TO_HOSPITAL':
+          await animateSpecialTeleport(currentAction.playerId, currentAction.hospitalIndex)
+          break
+
+        case 'BANKRUPT':
+          // 破产动画可以在未来添加
+          break
+      }
+
+      // 动画完成，通知 Action Queue 执行状态更新并取下一个 Action
+      completeAction()
+      setTurnState(TurnState.OnTile)
     }
-  }, [turnState, lastDiceResult, getCurrentPlayer, animateMovement, movePlayer, setTurnState])
+
+    playAnimation()
+  }, [currentAction, animateMovement, animateTeleport, animateSpecialTeleport, completeAction, setTurnState])
 
   return (
     <div

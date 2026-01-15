@@ -134,6 +134,38 @@ export interface EventSlice {
   applyEventEffect: (playerId: string, effect: SpecialEventEffect) => void
 }
 
+// ============ Action Types ============
+
+export type GameAction =
+  | { type: 'MOVE'; playerId: string; path: number[]; passedStart?: boolean }
+  | { type: 'TELEPORT'; playerId: string; fromIndex: number; toIndex: number }
+  | { type: 'TO_JAIL'; playerId: string; jailIndex: number; turns: number }
+  | { type: 'TO_HOSPITAL'; playerId: string; hospitalIndex: number; turns: number }
+  | { type: 'BANKRUPT'; playerId: string }
+
+export interface ActionSlice {
+  // State
+  actionQueue: GameAction[]
+  currentAction: GameAction | null
+  isProcessing: boolean
+
+  // Queue Management
+  pushAction: (action: GameAction) => void
+  pushActions: (actions: GameAction[]) => void
+  completeAction: () => void
+  clearActions: () => void
+
+  // Apply Action (Internal state update)
+  applyAction: (action: GameAction) => void
+
+  // Action Creators
+  createMoveAction: (playerId: string, startIndex: number, steps: number) => GameAction
+  createTeleportAction: (playerId: string, toIndex: number) => GameAction
+  createToJailAction: (playerId: string, turns?: number) => GameAction
+  createToHospitalAction: (playerId: string, turns?: number) => GameAction
+  createBankruptAction: (playerId: string) => GameAction
+}
+
 // ============ Combined Store Type ============
 
 export type GameStore = PlayerSlice &
@@ -141,7 +173,8 @@ export type GameStore = PlayerSlice &
   GameFlowSlice &
   CardSlice &
   BankSlice &
-  EventSlice
+  EventSlice &
+  ActionSlice
 
 // ============ Slice Creator Type ============
 

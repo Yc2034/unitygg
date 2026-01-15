@@ -226,7 +226,7 @@ export const createGameFlowSlice: SliceCreator<GameFlowSlice> = (set, get) => ({
   // ============ Dice Actions ============
 
   rollDice: () => {
-    const { forcedDiceValue, addLog } = get()
+    const { forcedDiceValue, addLog, getCurrentPlayer, createMoveAction, pushAction } = get()
 
     let value: number
     if (forcedDiceValue !== null) {
@@ -246,6 +246,13 @@ export const createGameFlowSlice: SliceCreator<GameFlowSlice> = (set, get) => ({
 
     set({ lastDiceResult: result, turnState: TurnState.Rolling })
     addLog(`掷出了 ${value} 点`)
+
+    // 创建移动 Action 并推入队列
+    const player = getCurrentPlayer()
+    if (player) {
+      const moveAction = createMoveAction(player.id, player.currentTileIndex, value)
+      pushAction(moveAction)
+    }
 
     return result
   },

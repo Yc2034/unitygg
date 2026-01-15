@@ -13,9 +13,10 @@ import { createGameFlowSlice } from './slices/gameFlowSlice'
 import { createCardSlice } from './slices/cardSlice'
 import { createBankSlice } from './slices/bankSlice'
 import { createEventSlice } from './slices/eventSlice'
+import { createActionSlice } from './slices/actionSlice'
 
 // Re-export types for external use
-export type { GameStore, PlayerConfig } from './slices/types'
+export type { GameStore, PlayerConfig, GameAction } from './slices/types'
 
 // Import types for the store type
 import type { GameStore } from './slices/types'
@@ -30,5 +31,6 @@ export const useGameStore = create<GameStore>()(
     ...createCardSlice(...a),
     ...createBankSlice(...a),
     ...createEventSlice(...a),
+    ...createActionSlice(...a),
   }))
 )

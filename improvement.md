@@ -2,50 +2,6 @@
 
 本文档基于对当前项目架构 (`ARCHITECTURE.md`, `gameStore.ts`, `Board.tsx`) 的分析，提出针对性的架构优化与新功能实现方向建议。
 
-## 一、 架构优化：切分状态管理 (Slice Pattern)
-
-目前 `gameStore.ts` 承担了过多的职责（游戏流、玩家、地图、UI、交互），是一个典型的 "God Object"。建议利用 Zustand 的 Slice 模式将状态拆分。
-
-### 建议的文件结构
-```
-src/stores/
-├── gameStore.ts          # 主 Store，合并所有 Slices
-├── slices/
-│   ├── playerSlice.ts    # 玩家数据、移动、资金操作
-│   ├── boardSlice.ts     # 地图数据、地产升级、设施
-│   ├── gameFlowSlice.ts  # 回合流转、各个阶段 (Rolling/Moving) 切换
-│   ├── systemSlice.ts    # UI弹窗、音效配置、全局设置
-│   └── stockSlice.ts     # (新) 股票市场逻辑
-```
-
-### 实施方式
-将 `gameStore.ts` 改为组合模式：
-```typescript
-export const useGameStore = create<GameStore>()((...a) => ({
-  ...createPlayerSlice(...a),
-  ...createBoardSlice(...a),
-  ...createGameFlowSlice(...a),
-  // ...
-}))
-```
-**收益**：
-*   **可维护性**：每个文件都在 200-300 行以内，逻辑清晰。
-*   **团队协作**：减少 Git 冲突。
-
-## 二、 逻辑与渲染分离：指令队列 (Action Queue)
-
-目前 `Board.tsx` 中的动画逻辑与状态更新耦合较紧。如果未来引入更复杂的连锁反应（如：踩地雷 ->爆炸动画 -> 飞到医院 -> 住院动画），当前的 Promise 链式调用会很难维护。
-
-### 建议方案
-引入 **Action Queue** 中间层：
-1.  **Store** 不直接修改状态并假设 UI 立即把动画播完，而是产生一个 `Action` 和 `State Update`。
-2.  **UI 层** 监听 `currentAction`。
-3.  **流程**：
-    *   逻辑层：`pushAction({ type: 'MOVE', playerId: 'p1', path: [1, 2, 3] })`
-    *   UI 层：监听到 Action -> 播放动画 -> 动画结束 -> 调用 `completeAction()`
-    *   逻辑层：`completeAction()` 触发状态更新，检查是否有下一个 Action。
-
-**收益**：逻辑层不需要知道动画播了多久，只需要关心数据变更。
 
 ## 三、 新功能实现方向
 
