@@ -17,49 +17,42 @@ function App() {
   // Game Screen
   return (
     <div style={styles.gameContainer}>
-      {/* Top Bar */}
-      <div style={styles.topBar}>
-        <h1 style={styles.logo}>大富翁4</h1>
-        <div style={styles.controls}>
+      {/* Board Layer (Fullscreen) */}
+      <div style={styles.boardLayer}>
+        <Board />
+      </div>
+
+      {/* UI Layer (Overlay) */}
+      <div style={styles.uiLayer}>
+        <GameUI />
+
+        {/* Top Controls (Pause) */}
+        <div style={styles.topControls}>
           {gameState === GameState.Playing && (
-            <button style={styles.controlButton} onClick={pauseGame}>
-              暂停
+            <button style={styles.iconButton} onClick={pauseGame} title="暂停">
+              ⏸
             </button>
           )}
           {gameState === GameState.Paused && (
-            <button style={styles.controlButton} onClick={resumeGame}>
-              继续
+            <button style={styles.iconButton} onClick={resumeGame} title="继续">
+              ▶
             </button>
           )}
         </div>
       </div>
 
-      {/* Main Game Area */}
-      <div style={styles.mainArea}>
-        {/* Board */}
-        <div style={styles.boardContainer}>
-          <Board />
-        </div>
-
-        {/* Side Panel */}
-        <div style={styles.sidePanel}>
-          <GameUI />
-        </div>
-      </div>
-
-      {/* Pause Overlay */}
+      {/* Overlays (Pause/Game Over) */}
       {gameState === GameState.Paused && (
-        <div style={styles.pauseOverlay}>
-          <div style={styles.pauseModal}>
-            <h2>游戏暂停</h2>
-            <button style={styles.resumeButton} onClick={resumeGame}>
+        <div style={styles.overlay}>
+          <div style={styles.modal}>
+            <h2 style={styles.modalTitle}>游戏暂停</h2>
+            <button style={styles.primaryButton} onClick={resumeGame}>
               继续游戏
             </button>
           </div>
         </div>
       )}
 
-      {/* Game Over Overlay */}
       {gameState === GameState.GameOver && <GameOverScreen />}
     </div>
   )
@@ -67,8 +60,6 @@ function App() {
 
 function GameOverScreen() {
   const { players } = useGameStore()
-
-  // Find winner (the one not bankrupt)
   const winner = players.find((p) => p.state !== 'Bankrupt')
 
   const handleRestart = () => {
@@ -76,19 +67,19 @@ function GameOverScreen() {
   }
 
   return (
-    <div style={styles.pauseOverlay}>
-      <div style={styles.gameOverModal}>
-        <h2 style={styles.gameOverTitle}>游戏结束!</h2>
+    <div style={styles.overlay}>
+      <div style={styles.modal}>
+        <h2 style={styles.modalTitle}>游戏结束!</h2>
         {winner && (
           <div style={styles.winnerInfo}>
             <p style={styles.winnerName}>{winner.name}</p>
-            <p style={styles.winnerLabel}>获胜!</p>
+            <p>最终获胜!</p>
             <p style={styles.winnerStats}>
-              最终资产: ${winner.totalAssets.toLocaleString()}
+              总资产: ${winner.totalAssets.toLocaleString()}
             </p>
           </div>
         )}
-        <button style={styles.restartButton} onClick={handleRestart}>
+        <button style={styles.primaryButton} onClick={handleRestart}>
           重新开始
         </button>
       </div>
@@ -98,127 +89,91 @@ function GameOverScreen() {
 
 const styles: Record<string, React.CSSProperties> = {
   gameContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#1a1a2e',
+    position: 'relative',
+    width: '100vw',
+    height: '100vh',
+    overflow: 'hidden',
+    backgroundColor: '#000',
   },
-  topBar: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '8px 16px',
-    backgroundColor: '#16213e',
-    borderBottom: '1px solid #333',
+  boardLayer: {
+    position: 'absolute',
+    inset: 0,
+    zIndex: 0,
   },
-  logo: {
-    margin: 0,
-    fontSize: '24px',
-    color: '#4ecdc4',
-    fontWeight: 'bold',
+  uiLayer: {
+    position: 'absolute',
+    inset: 0,
+    zIndex: 1,
+    pointerEvents: 'none', // Allow clicks to pass through to board where no UI exists
   },
-  controls: {
-    display: 'flex',
-    gap: '8px',
+  topControls: {
+    position: 'absolute',
+    top: '16px',
+    right: '16px',
+    pointerEvents: 'auto',
   },
-  controlButton: {
-    padding: '8px 16px',
-    backgroundColor: '#333',
-    border: 'none',
-    borderRadius: '4px',
+  iconButton: {
+    width: '40px',
+    height: '40px',
+    borderRadius: '50%',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     color: '#fff',
+    fontSize: '20px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     cursor: 'pointer',
-    fontSize: '14px',
+    border: '2px solid rgba(255, 255, 255, 0.2)',
+    transition: 'all 0.2s',
   },
-  mainArea: {
+  overlay: {
+    position: 'absolute',
+    inset: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     display: 'flex',
-    flex: 1,
-    overflow: 'hidden',
-  },
-  boardContainer: {
-    flex: 1,
-    display: 'flex',
-    justifyContent: 'center',
     alignItems: 'center',
-    padding: '16px',
-  },
-  sidePanel: {
-    width: '350px',
-    borderLeft: '1px solid #333',
-    overflow: 'hidden',
-  },
-  pauseOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    display: 'flex',
     justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
+    zIndex: 100,
   },
-  pauseModal: {
-    padding: '40px',
-    backgroundColor: '#16213e',
+  modal: {
+    backgroundColor: '#2b3b6b',
+    padding: '32px',
     borderRadius: '16px',
+    border: '2px solid #fff',
     textAlign: 'center',
     color: '#fff',
+    minWidth: '320px',
+    boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
   },
-  resumeButton: {
-    marginTop: '20px',
-    padding: '12px 32px',
-    backgroundColor: '#4ecdc4',
-    border: 'none',
-    borderRadius: '8px',
-    color: '#000',
-    fontSize: '18px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-  },
-  gameOverModal: {
-    padding: '40px',
-    backgroundColor: '#16213e',
-    borderRadius: '16px',
-    textAlign: 'center',
-    color: '#fff',
-    minWidth: '300px',
-  },
-  gameOverTitle: {
-    margin: '0 0 20px 0',
-    fontSize: '32px',
-    color: '#ffe66d',
+  modalTitle: {
+    margin: '0 0 24px 0',
+    fontSize: '28px',
+    color: '#fc0',
   },
   winnerInfo: {
-    marginBottom: '20px',
+    marginBottom: '24px',
+    fontSize: '18px',
   },
   winnerName: {
-    fontSize: '28px',
+    fontSize: '32px',
     fontWeight: 'bold',
-    color: '#4ecdc4',
-    margin: '0 0 8px 0',
-  },
-  winnerLabel: {
-    fontSize: '20px',
-    color: '#fff',
-    margin: '0 0 8px 0',
+    color: '#fc0',
+    marginBottom: '8px',
   },
   winnerStats: {
-    fontSize: '16px',
-    color: '#888',
-    margin: 0,
+    color: '#ddd',
+    marginTop: '8px',
   },
-  restartButton: {
+  primaryButton: {
     padding: '12px 32px',
-    backgroundColor: '#4ecdc4',
-    border: 'none',
-    borderRadius: '8px',
-    color: '#000',
     fontSize: '18px',
     fontWeight: 'bold',
+    backgroundColor: '#d66',
+    color: '#fff',
+    borderRadius: '8px',
+    border: 'none',
     cursor: 'pointer',
+    boxShadow: '0 4px 0 #900',
   },
 }
 
