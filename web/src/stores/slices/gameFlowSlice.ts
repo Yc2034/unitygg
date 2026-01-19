@@ -12,10 +12,8 @@ import {
   PropertyFacility,
   CardData,
   DiceResult,
-  GameConstants,
-  DefaultCards,
-  MapDefinitions,
 } from '@/types'
+import { DefaultCards, GameConstants, MapDefinitions } from '@/constants/maps'
 import type { MapId, PropertyConfig } from '@/types'
 import { generateId, calculateBoardPositions, calculateBoardPositionsFromGrid } from '@/utils/helpers'
 import type { GameFlowSlice, SliceCreator, PlayerConfig } from './types'

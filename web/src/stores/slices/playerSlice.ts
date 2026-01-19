@@ -5,10 +5,10 @@
 import {
   PlayerState,
   TileType,
-  GameConstants,
   PropertyFacility,
   TileData,
 } from '@/types'
+import { GameConstants } from '@/constants/maps'
 import type { PlayerSlice, SliceCreator } from './types'
 
 // Helper to calculate total property value for a player
@@ -118,11 +118,11 @@ export const createPlayerSlice: SliceCreator<PlayerSlice> = (set, get) => ({
       players: state.players.map((p) =>
         p.id === playerId
           ? {
-              ...p,
-              state: PlayerState.InJail,
-              turnsToSkip: turns,
-              currentTileIndex: jailTile.index,
-            }
+            ...p,
+            state: PlayerState.InJail,
+            turnsToSkip: turns,
+            currentTileIndex: jailTile.index,
+          }
           : p
       ),
     }))
@@ -140,11 +140,11 @@ export const createPlayerSlice: SliceCreator<PlayerSlice> = (set, get) => ({
       players: state.players.map((p) =>
         p.id === playerId
           ? {
-              ...p,
-              state: PlayerState.InHospital,
-              turnsToSkip: turns,
-              currentTileIndex: hospitalTile.index,
-            }
+            ...p,
+            state: PlayerState.InHospital,
+            turnsToSkip: turns,
+            currentTileIndex: hospitalTile.index,
+          }
           : p
       ),
     }))
@@ -160,24 +160,24 @@ export const createPlayerSlice: SliceCreator<PlayerSlice> = (set, get) => ({
       players: state.players.map((p) =>
         p.id === playerId
           ? {
-              ...p,
-              state: PlayerState.Bankrupt,
-              money: 0,
-            }
+            ...p,
+            state: PlayerState.Bankrupt,
+            money: 0,
+          }
           : p
       ),
       // Clear all properties owned by bankrupt player
       tiles: state.tiles.map((t) =>
         t.propertyData?.ownerId === playerId
           ? {
-              ...t,
-              propertyData: {
-                ...t.propertyData,
-                ownerId: null,
-                level: 0,
-                facilityType: PropertyFacility.None,
-              },
-            }
+            ...t,
+            propertyData: {
+              ...t.propertyData,
+              ownerId: null,
+              level: 0,
+              facilityType: PropertyFacility.None,
+            },
+          }
           : t
       ),
     }))

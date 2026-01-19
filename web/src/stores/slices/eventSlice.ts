@@ -4,13 +4,9 @@
 
 import {
   TileType,
-  GameConstants,
-  SpecialEvent,
-  NewsEvents,
-  LotteryEvents,
-  ChanceEvents,
-  FateEvents,
 } from '@/types'
+import { SpecialEvent } from '@/types'
+import { GameConstants, ChanceEvents, FateEvents, NewsEvents, LotteryEvents } from '@/constants/maps'
 import { generateId } from '@/utils/helpers'
 import type { EventSlice, SliceCreator } from './types'
 
@@ -109,10 +105,11 @@ export const createEventSlice: SliceCreator<EventSlice> = (set, get) => ({
 
     switch (effect.type) {
       case 'money':
-        if (effect.amount > 0) {
-          addMoney(playerId, effect.amount)
-        } else if (effect.amount < 0) {
-          const canPay = spendMoney(playerId, Math.abs(effect.amount))
+        const moneyAmount = effect.amount || 0
+        if (moneyAmount > 0) {
+          addMoney(playerId, moneyAmount)
+        } else if (moneyAmount < 0) {
+          const canPay = spendMoney(playerId, Math.abs(moneyAmount))
           if (!canPay) {
             // 钱不够，破产
             setBankrupt(playerId)
@@ -121,32 +118,33 @@ export const createEventSlice: SliceCreator<EventSlice> = (set, get) => ({
         break
 
       case 'move':
-        const moveAction = createMoveAction(playerId, player.currentTileIndex, effect.steps)
+        const moveAction = createMoveAction(playerId, player.currentTileIndex, effect.steps || 0)
         pushAction(moveAction)
         break
 
       case 'teleport':
-        teleportPlayer(playerId, effect.tileIndex)
+        const targetTile = effect.tileIndex ?? 0
+        teleportPlayer(playerId, targetTile)
         // 如果传送到起点，给工资
-        if (effect.tileIndex === 0) {
+        if (targetTile === 0) {
           addMoney(playerId, GameConstants.SalaryOnPassStart)
           addLog(`${player.name} 获得起点奖励 ${GameConstants.SalaryOnPassStart} 元`)
         }
         break
 
       case 'jail':
-        sendToJail(playerId, effect.turns)
+        sendToJail(playerId, effect.turns || 1)
         break
 
       case 'hospital':
-        sendToHospital(playerId, effect.turns)
+        sendToHospital(playerId, effect.turns || 1)
         break
 
       case 'collectFromAll':
-        const activePlayers = getActivePlayers()
-        activePlayers.forEach((p) => {
+        const activePlayers1 = getActivePlayers()
+        activePlayers1.forEach((p) => {
           if (p.id !== playerId) {
-            transferMoney(p.id, playerId, effect.amount)
+            transferMoney(p.id, playerId, effect.amount || 0)
           }
         })
         break
@@ -155,7 +153,7 @@ export const createEventSlice: SliceCreator<EventSlice> = (set, get) => ({
         const allPlayers = getActivePlayers()
         allPlayers.forEach((p) => {
           if (p.id !== playerId) {
-            transferMoney(playerId, p.id, effect.amount)
+            transferMoney(playerId, p.id, effect.amount || 0)
           }
         })
         break
@@ -168,7 +166,7 @@ export const createEventSlice: SliceCreator<EventSlice> = (set, get) => ({
       case 'skipTurn':
         set((state) => ({
           players: state.players.map((p) =>
-            p.id === playerId ? { ...p, turnsToSkip: p.turnsToSkip + effect.turns } : p
+            p.id === playerId ? { ...p, turnsToSkip: p.turnsToSkip + (effect.turns || 1) } : p
           ),
         }))
         break

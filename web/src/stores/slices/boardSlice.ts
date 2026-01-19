@@ -2,7 +2,8 @@
  * Board Slice - 地图数据、地产操作、设施
  */
 
-import { GameConstants, PropertyFacility } from '@/types'
+import { PropertyFacility } from '@/types'
+import { GameConstants } from '@/constants/maps'
 import type { BoardSlice, SliceCreator } from './types'
 
 export const createBoardSlice: SliceCreator<BoardSlice> = (set, get) => ({
@@ -33,21 +34,21 @@ export const createBoardSlice: SliceCreator<BoardSlice> = (set, get) => ({
       tiles: state.tiles.map((t) =>
         t.index === tileIndex
           ? {
-              ...t,
-              propertyData: { ...t.propertyData!, ownerId: playerId, level: 1 },
-            }
+            ...t,
+            propertyData: { ...t.propertyData!, ownerId: playerId, level: 1 },
+          }
           : t
       ),
       players: state.players.map((p) =>
         p.id === playerId
           ? {
-              ...p,
-              ownedPropertyIndices: [...p.ownedPropertyIndices, tileIndex],
-              stats: {
-                ...p.stats,
-                totalTilesPurchased: p.stats.totalTilesPurchased + 1,
-              },
-            }
+            ...p,
+            ownedPropertyIndices: [...p.ownedPropertyIndices, tileIndex],
+            stats: {
+              ...p.stats,
+              totalTilesPurchased: p.stats.totalTilesPurchased + 1,
+            },
+          }
           : p
       ),
     }))
@@ -77,9 +78,9 @@ export const createBoardSlice: SliceCreator<BoardSlice> = (set, get) => ({
       tiles: state.tiles.map((t) =>
         t.index === tileIndex
           ? {
-              ...t,
-              propertyData: { ...t.propertyData!, level: level + 1 },
-            }
+            ...t,
+            propertyData: { ...t.propertyData!, level: level + 1 },
+          }
           : t
       ),
     }))
@@ -106,9 +107,9 @@ export const createBoardSlice: SliceCreator<BoardSlice> = (set, get) => ({
       tiles: state.tiles.map((t) =>
         t.index === tileIndex
           ? {
-              ...t,
-              propertyData: { ...t.propertyData!, isMortgaged: true },
-            }
+            ...t,
+            propertyData: { ...t.propertyData!, isMortgaged: true },
+          }
           : t
       ),
     }))
@@ -143,9 +144,9 @@ export const createBoardSlice: SliceCreator<BoardSlice> = (set, get) => ({
       tiles: state.tiles.map((t) =>
         t.index === tileIndex
           ? {
-              ...t,
-              propertyData: { ...t.propertyData!, isMortgaged: false },
-            }
+            ...t,
+            propertyData: { ...t.propertyData!, isMortgaged: false },
+          }
           : t
       ),
     }))
@@ -179,9 +180,9 @@ export const createBoardSlice: SliceCreator<BoardSlice> = (set, get) => ({
       tiles: state.tiles.map((t) =>
         t.index === tileIndex
           ? {
-              ...t,
-              propertyData: { ...t.propertyData!, facilityType: facility },
-            }
+            ...t,
+            propertyData: { ...t.propertyData!, facilityType: facility },
+          }
           : t
       ),
     }))

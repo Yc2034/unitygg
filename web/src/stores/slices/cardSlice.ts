@@ -2,7 +2,8 @@
  * Card Slice - 卡牌系统、商店
  */
 
-import { CardData, CardType, GameConstants, PlayerState, DefaultCards } from '@/types'
+import { CardData, CardType, PlayerState } from '@/types'
+import { GameConstants, DefaultCards } from '@/constants/maps'
 import { generateId } from '@/utils/helpers'
 import type { CardSlice, SliceCreator } from './types'
 
@@ -133,12 +134,12 @@ export const createCardSlice: SliceCreator<CardSlice> = (set, get) => ({
                 tiles: state.tiles.map((t) =>
                   t.index === prop.index
                     ? {
-                        ...t,
-                        propertyData: {
-                          ...t.propertyData!,
-                          level: Math.max(0, (t.propertyData?.level || 0) - 1),
-                        },
-                      }
+                      ...t,
+                      propertyData: {
+                        ...t.propertyData!,
+                        level: Math.max(0, (t.propertyData?.level || 0) - 1),
+                      },
+                    }
                     : t
                 ),
               }))

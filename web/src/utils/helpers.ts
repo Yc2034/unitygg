@@ -108,6 +108,8 @@ export function calculateBoardPositionsFromGrid(
   let maxY = Number.NEGATIVE_INFINITY
 
   Object.entries(gridPositions).forEach(([index, pos]) => {
+    // Standard Iso projection: x becomes x+y, y becomes y-x (or variations)
+    // Here we use the existing helper
     const isoPos = gridToIso(pos.x, pos.y, BoardMetrics.tileWidth, BoardMetrics.tileHeight)
     isoPositions[Number(index)] = isoPos
     minX = Math.min(minX, isoPos.x)
@@ -116,10 +118,13 @@ export function calculateBoardPositionsFromGrid(
     maxY = Math.max(maxY, isoPos.y)
   })
 
+  // Center alignment
   const centerX = (minX + maxX) / 2
   const centerY = (minY + maxY) / 2
-  const offsetX = BoardMetrics.boardWidth / 2 - centerX
-  const offsetY = BoardMetrics.boardHeight / 2 - centerY + BoardMetrics.boardVerticalBias
+
+  // No fixed offset, centering at (0,0) effectively for the camera to look at
+  const offsetX = -centerX
+  const offsetY = -centerY
 
   const adjusted: Record<number, Position> = {}
   Object.entries(isoPositions).forEach(([index, pos]) => {
@@ -174,7 +179,7 @@ export function shuffle<T>(array: T[]): T[] {
   const result = [...array]
   for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
-    ;[result[i], result[j]] = [result[j], result[i]]
+      ;[result[i], result[j]] = [result[j], result[i]]
   }
   return result
 }

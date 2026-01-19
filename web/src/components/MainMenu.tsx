@@ -5,7 +5,8 @@
 
 import { useState } from 'react'
 import { useGameStore, PlayerConfig } from '@/stores/gameStore'
-import { GameConstants, MapDefinitions, MapId } from '@/types'
+import { MapId } from '@/types'
+import { MapDefinitions, GameConstants } from '@/constants/maps'
 import { CHARACTER_OPTIONS } from '@/constants/characters'
 import { STARTING_MONEY_OPTIONS } from '@/constants/menu'
 
@@ -31,7 +32,7 @@ export function MainMenu() {
   ])
   const [activePlayerIndex, setActivePlayerIndex] = useState(0)
   const [startingMoney, setStartingMoney] = useState<number>(GameConstants.StartingMoney)
-  const [selectedMapId, setSelectedMapId] = useState<MapId>(MapDefinitions[0]?.id ?? 'map1')
+  const [selectedMapId, setSelectedMapId] = useState<string>('richman_classic')
 
   const activePlayer = playerConfigs[activePlayerIndex]
 
@@ -57,7 +58,7 @@ export function MainMenu() {
   }
 
   const handleStartGame = () => {
-    initGame(playerConfigs.slice(0, playerCount), startingMoney, selectedMapId)
+    initGame(playerConfigs.slice(0, playerCount), startingMoney, selectedMapId as MapId)
     startGame()
   }
 

@@ -3,8 +3,9 @@
  * 将游戏逻辑与渲染动画解耦
  */
 
-import { TileType, GameConstants, PlayerState, PropertyFacility, TurnState } from '@/types'
-import type { PendingMove } from '@/types'
+import { TurnState, PlayerState, TileType, PropertyFacility } from '@/types'
+import type { PendingMove } from '@/types' // Keep this import
+import { GameConstants } from '@/constants/maps'
 import type { ActionSlice, SliceCreator } from './types'
 
 type MoveBuildResult = {
@@ -214,12 +215,12 @@ export const createActionSlice: SliceCreator<ActionSlice> = (set, get) => ({
           players: state.players.map((p) =>
             p.id === playerId
               ? {
-                  ...p,
-                  state: PlayerState.InJail,
-                  turnsToSkip: turns,
-                  currentTileIndex: jailIndex,
-                  lastTileIndex: null,
-                }
+                ...p,
+                state: PlayerState.InJail,
+                turnsToSkip: turns,
+                currentTileIndex: jailIndex,
+                lastTileIndex: null,
+              }
               : p
           ),
         }))
@@ -236,12 +237,12 @@ export const createActionSlice: SliceCreator<ActionSlice> = (set, get) => ({
           players: state.players.map((p) =>
             p.id === playerId
               ? {
-                  ...p,
-                  state: PlayerState.InHospital,
-                  turnsToSkip: turns,
-                  currentTileIndex: hospitalIndex,
-                  lastTileIndex: null,
-                }
+                ...p,
+                state: PlayerState.InHospital,
+                turnsToSkip: turns,
+                currentTileIndex: hospitalIndex,
+                lastTileIndex: null,
+              }
               : p
           ),
         }))
@@ -258,24 +259,24 @@ export const createActionSlice: SliceCreator<ActionSlice> = (set, get) => ({
           players: state.players.map((p) =>
             p.id === playerId
               ? {
-                  ...p,
-                  state: PlayerState.Bankrupt,
-                  money: 0,
-                }
+                ...p,
+                state: PlayerState.Bankrupt,
+                money: 0,
+              }
               : p
           ),
           // Clear all properties owned by bankrupt player
           tiles: state.tiles.map((t) =>
             t.propertyData?.ownerId === playerId
               ? {
-                  ...t,
-                  propertyData: {
-                    ...t.propertyData,
-                    ownerId: null,
-                    level: 0,
-                    facilityType: PropertyFacility.None,
-                  },
-                }
+                ...t,
+                propertyData: {
+                  ...t.propertyData,
+                  ownerId: null,
+                  level: 0,
+                  facilityType: PropertyFacility.None,
+                },
+              }
               : t
           ),
         }))

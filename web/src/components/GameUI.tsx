@@ -7,8 +7,11 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useGameStore } from '@/stores/gameStore'
-import { TurnState, PlayerState, TileType, GameState, PropertyFacility, GameConstants } from '@/types'
-import { formatCurrency, getPlayerColor } from '@/utils/helpers'
+import {
+  TurnState, TileType, GameState, PropertyFacility,
+} from '@/types'
+import { GameConstants } from '@/constants/maps'
+import { formatCurrency } from '@/utils/helpers'
 import { aiController } from '@/game/AIController'
 import './GameUI.css'
 import { CHARACTER_OPTIONS } from '@/constants/characters'
@@ -19,8 +22,7 @@ export function GameUI() {
   const {
     gameState,
     turnState,
-    players,
-    currentPlayerIndex,
+
     turnNumber,
     roundNumber,
     lastDiceResult,
@@ -206,12 +208,7 @@ export function GameUI() {
     // Stop after 500ms and execute logic
     setTimeout(() => {
       clearInterval(interval);
-      const result = rollDice(); // This returns void in current store but updates state
-      // We need to wait for state update to get the actual result, 
-      // but since rollDice is sync in store, we can just grab it from next render or assume store update happens fast.
-      // Actually, we can't easily get the *result* value here if rollDice doesn't return it.
-      // But we can observe `lastDiceResult` in a useEffect if needed, 
-      // OR we can just stop the animation on a random number and let the store source of truth update take over UI.
+      rollDice(); // This returns void in current store but updates state
       setIsRolling(false);
     }, 500);
   }
@@ -267,6 +264,13 @@ export function GameUI() {
   const handleBuyShopCard = (index: number) => {
     if (!currentPlayer) return;
     buyCard(currentPlayer.id, index);
+  }
+
+  const handleSelectFacility = (facility: PropertyFacility) => {
+    if (resortChoiceTileIndex === null) return
+    setPropertyFacility(resortChoiceTileIndex, facility)
+    setResortChoiceTileIndex(null)
+    endTurn()
   }
 
   // --- UI Renders ---

@@ -2,7 +2,8 @@
  * Bank Slice - 贷款系统
  */
 
-import { LoanData, GameConstants } from '@/types'
+import { LoanData } from '@/types'
+import { GameConstants } from '@/constants/maps'
 import { generateId } from '@/utils/helpers'
 import type { BankSlice, SliceCreator } from './types'
 

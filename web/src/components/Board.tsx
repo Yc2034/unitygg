@@ -6,7 +6,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import * as PIXI from 'pixi.js'
 import { useGameStore } from '@/stores/gameStore'
-import { TileType, TurnState, PlayerState, PropertyFacility } from '@/types'
+import { TileType, TurnState, PlayerState } from '@/types'
 import {
   BoardMetrics,
   clamp,
@@ -18,7 +18,6 @@ import {
   delay,
 } from '@/utils/helpers'
 
-const BOARD_WIDTH = BoardMetrics.boardWidth
 const BOARD_HEIGHT = BoardMetrics.boardHeight
 const TILE_WIDTH = BoardMetrics.tileWidth
 const TILE_HEIGHT = BoardMetrics.tileHeight
@@ -312,166 +311,162 @@ export function Board() {
       entitiesContainer.removeChild(child)
     })
 
+    // Render Loop
     tiles.forEach((tile) => {
       const tileContainer = new PIXI.Container()
-      tileContainer.x = tile.position.x
-      tileContainer.y = tile.position.y
-      tileContainer.zIndex = tile.position.y
+      // Base position (Road Node)
+      const posX = tile.position.x
+      const posY = tile.position.y
 
-      const visualScale = tile.propertyData?.visualScale ?? 1
-      const tileWidth = TILE_WIDTH * visualScale
-      const tileHeight = TILE_HEIGHT * visualScale
-      const tileThickness = TILE_THICKNESS * (0.9 + 0.2 * visualScale)
+      // Z-Index: Y-sorting for 2.5D
+      tileContainer.zIndex = posY
 
-      let baseColor = getTileColor(tile.type)
-      if (tile.type === TileType.Property && tile.propertyData) {
-        baseColor = getRegionColor(tile.propertyData.region)
-      }
+      const config = tile.renderConfig || { style: 'road' }
 
-      const tileColors: IsoFaceColors = {
-        top: lighten(baseColor, 0.12),
-        left: darken(baseColor, 0.28),
-        right: darken(baseColor, 0.16),
-        stroke: lighten(baseColor, 0.32),
-      }
-      const tilePrism = createIsoPrism(tileWidth, tileHeight, tileThickness, tileColors, 'down')
-      tileContainer.addChild(tilePrism)
+      // ===========================
+      // 1. Render Path (Road)
+      // ===========================
+      if (config.style === 'road') {
+        // Road Mesh
+        const roadWidth = TILE_WIDTH * 0.8
+        const roadHeight = TILE_HEIGHT * 0.8
+        const roadThickness = 8
 
-      const nameText = new PIXI.Text(tile.name, {
-        fontSize: 12,
-        fill: 0xf7f7f2,
-        fontWeight: 'bold',
-      })
-      nameText.anchor.set(0.5)
-      nameText.x = 0
-      nameText.y = -tileHeight * 0.15
-      tileContainer.addChild(nameText)
-
-      if (tile.type === TileType.Property && tile.propertyData) {
-        const { level, ownerId } = tile.propertyData
-
-        if (!ownerId) {
-          const priceText = new PIXI.Text(`$${tile.propertyData.basePrice}`, {
-            fontSize: 10,
-            fill: 0xe3e3e3,
-          })
-          priceText.anchor.set(0.5)
-          priceText.x = 0
-          priceText.y = tileHeight * 0.12
-          tileContainer.addChild(priceText)
+        const roadColors: IsoFaceColors = {
+          top: 0x5a6d8a, // Grey-Blue simplified road
+          left: 0x3e4c63,
+          right: 0x475670,
+          stroke: 0x6b7f9e
         }
+        const roadPrism = createIsoPrism(roadWidth, roadHeight, roadThickness, roadColors, 'down')
+        tileContainer.addChild(roadPrism)
+        tileContainer.x = posX
+        tileContainer.y = posY
 
-        if (level > 0) {
-          const ownerIndex = ownerId ? players.findIndex((p) => p.id === ownerId) : -1
-          const ownerColor = ownerIndex >= 0 ? getPlayerColor(ownerIndex) : 0xeeeeee
-          const building = new PIXI.Container()
-          building.name = `${BUILDING_TAG}${tile.index}`
-          building.x = tile.position.x
-          building.y = tile.position.y - tileHeight * 0.18
-          building.zIndex = tile.position.y + 1
+        // Road number/icon
+        const roadText = new PIXI.Text(tile.name, { fontSize: 9, fill: 0xcccccc })
+        roadText.anchor.set(0.5)
+        roadText.y = -5
+        tileContainer.addChild(roadText)
 
-          const baseWidth = tileWidth * (0.36 + level * 0.05)
-          const baseHeight = tileHeight * (0.36 + level * 0.05)
-          const baseDepth = 14 + level * 10
-          const buildingBase = lighten(baseColor, 0.2)
+        // ===========================
+        // 2. Render Attached Property (if any)
+        // ===========================
+        // ===========================
+        if (tile.type === TileType.Property && tile.propertyData) {
+          const { level, ownerId, region } = tile.propertyData
 
-          const baseColors: IsoFaceColors = {
-            top: lighten(buildingBase, 0.18),
-            left: darken(buildingBase, 0.28),
-            right: darken(buildingBase, 0.12),
-            stroke: lighten(buildingBase, 0.32),
-          }
+          // Visual size
+          const bScale = tile.propertyData.visualScale || 1
+          const bWidth = TILE_WIDTH * 1.2 * bScale
+          const bHeight = TILE_HEIGHT * 1.2 * bScale
 
-          const shadow = new PIXI.Graphics()
-          shadow.beginFill(0x000000, 0.18)
-          shadow.drawEllipse(0, tileHeight * 0.22, baseWidth * 0.4, baseHeight * 0.2)
-          shadow.endFill()
-          shadow.filters = [new PIXI.filters.BlurFilter(4)]
-          building.addChild(shadow)
+          // Offset Calculation based on buildingDirection or side
+          let bx = 0
+          let by = 0
+          const OFFSET_DIST = 55 // Distance from road center
 
-          const baseBlock = createIsoPrism(baseWidth, baseHeight, baseDepth, baseColors, 'up')
-          building.addChild(baseBlock)
-
-          if (level >= 2) {
-            const midColors: IsoFaceColors = {
-              top: lighten(buildingBase, 0.3),
-              left: darken(buildingBase, 0.35),
-              right: darken(buildingBase, 0.18),
-              stroke: lighten(buildingBase, 0.4),
+          if (config.buildingDirection) {
+            // Isometric Direction mapping
+            switch (config.buildingDirection) {
+              case 'up':
+                // Grid Up -> Screen Up-Right
+                bx = OFFSET_DIST
+                by = -OFFSET_DIST * 0.6
+                break
+              case 'right':
+                // Grid Right -> Screen Down-Right
+                bx = OFFSET_DIST
+                by = OFFSET_DIST * 0.6
+                break
+              case 'down':
+                // Grid Down -> Screen Down-Left
+                bx = -OFFSET_DIST
+                by = OFFSET_DIST * 0.6
+                break
+              case 'left':
+                // Grid Left -> Screen Up-Left
+                bx = -OFFSET_DIST
+                by = -OFFSET_DIST * 0.6
+                break
             }
-            const midBlock = createIsoPrism(
-              baseWidth * 0.75,
-              baseHeight * 0.75,
-              baseDepth * 0.7,
-              midColors,
-              'up'
-            )
-            midBlock.y = -baseDepth + 4
-            building.addChild(midBlock)
+          } else if (config.buildingSide === 'inner') {
+            // Legacy fallbacks
+            bx = 0
+            by = -20
+          } else {
+            // Legacy Outer
+            const offsetDist = 60
+            by = -offsetDist
           }
 
-          if (level >= 3) {
-            const towerColors: IsoFaceColors = {
-              top: lighten(buildingBase, 0.4),
-              left: darken(buildingBase, 0.4),
-              right: darken(buildingBase, 0.22),
-              stroke: lighten(buildingBase, 0.5),
-            }
-            const towerBlock = createIsoPrism(
-              baseWidth * 0.5,
-              baseHeight * 0.5,
-              baseDepth * 0.9,
-              towerColors,
-              'up'
-            )
-            towerBlock.y = -baseDepth - baseDepth * 0.35
-            building.addChild(towerBlock)
+          // Correction for Iso
+          const regionColor = getRegionColor(region)
+
+          // Owner color
+          const ownerIndex = ownerId ? players.findIndex(p => p.id === ownerId) : -1
+          const ownerColor = ownerIndex >= 0 ? getPlayerColor(ownerIndex) : 0xaaaaaa
+
+          // Draw Building
+          const bCols: IsoFaceColors = {
+            top: lighten(regionColor, 0.2),
+            left: darken(regionColor, 0.2),
+            right: darken(regionColor, 0.1),
+            stroke: 0xffffff
           }
+          const house = createIsoPrism(bWidth, bHeight, 20 + level * 15, bCols, 'up')
 
-          const flagPole = new PIXI.Graphics()
-          flagPole.lineStyle(2, 0xdddddd, 0.9)
-          flagPole.moveTo(baseWidth * 0.2, -baseDepth * 0.9)
-          flagPole.lineTo(baseWidth * 0.2, -baseDepth * 0.3)
-          building.addChild(flagPole)
+          // Shift building position
+          house.x = bx
+          house.y = by
 
-          const flag = new PIXI.Graphics()
-          flag.beginFill(ownerColor, 0.9)
-          flag.moveTo(baseWidth * 0.2, -baseDepth * 0.9)
-          flag.lineTo(baseWidth * 0.2 + 12, -baseDepth * 0.82)
-          flag.lineTo(baseWidth * 0.2, -baseDepth * 0.74)
-          flag.closePath()
-          flag.endFill()
-          building.addChild(flag)
+          // Add to tile
+          tileContainer.addChild(house)
 
-          entitiesContainer.addChild(building)
-        }
-
-        if (tile.propertyData.resortEnabled && tile.propertyData.facilityType !== PropertyFacility.None) {
-          const facilityLabel =
-            tile.propertyData.facilityType === PropertyFacility.Park
-              ? '公园'
-              : tile.propertyData.facilityType === PropertyFacility.Hotel
-                ? '酒店'
-                : '商场'
-          const facilityText = new PIXI.Text(facilityLabel, {
-            fontSize: 10,
-            fill: 0xf6f1d1,
-            fontWeight: 'bold',
-          })
-          facilityText.anchor.set(0.5)
-          facilityText.x = 0
-          facilityText.y = tileHeight * 0.28
-          tileContainer.addChild(facilityText)
+          // Owner Flag
+          if (ownerId) {
+            const flag = new PIXI.Graphics()
+            flag.beginFill(ownerColor)
+            flag.drawCircle(bx, by - 40 - level * 10, 5)
+            tileContainer.addChild(flag)
+          }
         }
       }
+      // ===========================
+      // 3. Render Large Site (Bank/Shop)
+      // ===========================
+      else if (config.style === 'site') {
+        const siteScale = config.modelScale || 1.5
+        const siteWidth = TILE_WIDTH * siteScale
+        const siteHeight = TILE_HEIGHT * siteScale
+        const siteThickness = 12
 
-      const indexText = new PIXI.Text(`${tile.index}`, {
-        fontSize: 8,
-        fill: 0x9ea5b6,
-      })
-      indexText.x = -tileWidth * 0.38
-      indexText.y = -tileHeight * 0.1
-      tileContainer.addChild(indexText)
+        const uiColor = getTileColor(tile.type)
+        const cols: IsoFaceColors = {
+          top: uiColor,
+          left: darken(uiColor, 0.3),
+          right: darken(uiColor, 0.15),
+          stroke: lighten(uiColor, 0.4)
+        }
+
+        const sitePrism = createIsoPrism(siteWidth, siteHeight, siteThickness, cols, 'down')
+        tileContainer.addChild(sitePrism)
+        tileContainer.x = posX
+        tileContainer.y = posY
+
+        // Label
+        const label = new PIXI.Text(tile.name, {
+          fontSize: 14,
+          fontFamily: 'Arial',
+          fontWeight: 'bold',
+          fill: 'white',
+          stroke: 0x000000,
+          strokeThickness: 3
+        })
+        label.anchor.set(0.5)
+        label.y = -siteHeight * 0.5
+        tileContainer.addChild(label)
+      }
 
       tilesContainer.addChild(tileContainer)
     })

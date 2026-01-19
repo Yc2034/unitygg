@@ -4,7 +4,8 @@
  */
 
 import { useGameStore } from '@/stores/gameStore'
-import { TileType, TurnState, GameState, GameConstants, PropertyFacility } from '@/types'
+import { TileType, GameState, TurnState, PropertyFacility } from '@/types'
+import { GameConstants } from '@/constants/maps'
 
 export interface AIDecision {
   action: 'roll' | 'purchase' | 'upgrade' | 'endTurn' | 'buyCard' | 'useCard'
@@ -180,9 +181,9 @@ export class AIController {
           tiles: state.tiles.map((t) =>
             t.index === lowestLevel.index
               ? {
-                  ...t,
-                  propertyData: { ...t.propertyData!, level: t.propertyData!.level + 1 },
-                }
+                ...t,
+                propertyData: { ...t.propertyData!, level: t.propertyData!.level + 1 },
+              }
               : t
           ),
         }))
