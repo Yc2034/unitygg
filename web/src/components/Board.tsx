@@ -313,209 +313,243 @@ export function Board() {
 
     // Render Loop
     tiles.forEach((tile) => {
-      const tileContainer = new PIXI.Container()
-      // Base position (Road Node)
+      // Configuration Defaults
+      const config = tile.renderConfig || { style: 'road' }
       const posX = tile.position.x
       const posY = tile.position.y
 
-      // Z-Index: Y-sorting for 2.5D
-      tileContainer.zIndex = posY
+      // ===========================
+      // 1. Render Road (Always render road for continuity)
+      // ===========================
+      const roadContainer = new PIXI.Container()
+      roadContainer.zIndex = posY - 100 // Ensure road is always "floor"
+      roadContainer.x = posX
+      roadContainer.y = posY
 
-      const config = tile.renderConfig || { style: 'road' }
+      const roadWidth = TILE_WIDTH * 0.9 // Continuous strip
+      const roadHeight = TILE_HEIGHT * 0.9
+      const roadThickness = 8
+
+      // Dark Asphalt Style
+      const roadColors: IsoFaceColors = {
+        top: 0x333333, // Dark asphalt
+        left: 0x222222,
+        right: 0x2a2a2a,
+        stroke: 0x444444
+      }
+
+      // Yellow line markings (Road Striping)
+      const roadBase = createIsoPrism(roadWidth, roadHeight, roadThickness, roadColors, 'down')
+      roadContainer.addChild(roadBase)
+
+      // Add dashed line in middle potentially, or just keep simple for now
+      // Simple marking
+      const marking = new PIXI.Graphics()
+      marking.lineStyle(2, 0xddaa00, 0.6)
+      // Isometric line projection roughly
+      marking.moveTo(-roadWidth * 0.3, 0)
+      marking.lineTo(roadWidth * 0.3, 0)
+      // Since it's ISO, flat line needs rotation or projection.
+      // Actually simpler: draw small rects on the top face of the roadBase
+      // But roadBase is a container with Graphics.
+      // Let's just create a separate graphic for markings on top
+      const stripes = new PIXI.Graphics()
+      stripes.beginFill(0xffcc00, 0.8)
+      // Draw a few dashes along the road direction
+      // Assuming road is somewhat linear or just a patch.
+      // For now, simple center dot or small strip
+      stripes.drawRoundedRect(-4, -1, 8, 2, 1)
+      stripes.endFill()
+      // Project to top face: y is offset by -roadHeight/2 roughly in the prism logic
+      stripes.y = -roadHeight / 2 // Approximate top surface center
+      // roadContainer.addChild(stripes) // Optional: Add later for polish
+
+      tilesContainer.addChild(roadContainer)
 
       // ===========================
-      // 1. Render Path (Road)
+      // 2. Render Attached Land/Building (Side-by-Side)
       // ===========================
-      if (config.style === 'road') {
-        // Road Mesh
-        const roadWidth = TILE_WIDTH * 0.8
-        const roadHeight = TILE_HEIGHT * 0.8
-        const roadThickness = 8
+      const isSite = config.style === 'site'
+      const isProperty = tile.type === TileType.Property
 
-        const roadColors: IsoFaceColors = {
-          top: 0x5a6d8a, // Grey-Blue simplified road
-          left: 0x3e4c63,
-          right: 0x475670,
-          stroke: 0x6b7f9e
+      if ((isSite || isProperty) && config.style !== 'empty' && tile.type !== TileType.Start) {
+
+        const propertyContainer = new PIXI.Container()
+
+        // Offset Calculation
+        const OFFSET_DIST = isSite ? 70 : 60
+        let ox = 0
+        let oy = 0
+
+        // Determine Offset based on direction
+        // Default to 'up' (Top-Right on screen) if not specified
+        const direction = config.buildingDirection || 'up'
+        switch (direction) {
+          case 'up': // Screen Top-Right
+            ox = OFFSET_DIST
+            oy = -OFFSET_DIST * 0.5
+            break
+          case 'right': // Screen Bottom-Right
+            ox = OFFSET_DIST
+            oy = OFFSET_DIST * 0.5
+            break
+          case 'down': // Screen Bottom-Left
+            ox = -OFFSET_DIST
+            oy = OFFSET_DIST * 0.5
+            break
+          case 'left': // Screen Top-Left
+            ox = -OFFSET_DIST
+            oy = -OFFSET_DIST * 0.5
+            break
         }
-        const roadPrism = createIsoPrism(roadWidth, roadHeight, roadThickness, roadColors, 'down')
-        tileContainer.addChild(roadPrism)
-        tileContainer.x = posX
-        tileContainer.y = posY
 
-        // Road number/icon
-        const roadText = new PIXI.Text(tile.name, { fontSize: 9, fill: 0xcccccc })
-        roadText.anchor.set(0.5)
-        roadText.y = -5
-        tileContainer.addChild(roadText)
+        const landX = posX + ox
+        const landY = posY + oy
 
-        // ===========================
-        // 2. Render Attached Property (if any)
-        // ===========================
-        // ===========================
-        if (tile.type === TileType.Property && tile.propertyData) {
+        propertyContainer.x = landX
+        propertyContainer.y = landY
+        propertyContainer.zIndex = landY // Sort by actual land position
+
+        // A. Land Base (Grass/Plot)
+        const landWidth = isSite ? TILE_WIDTH * 1.3 : TILE_WIDTH * 1.0
+        const landHeight = isSite ? TILE_HEIGHT * 1.3 : TILE_HEIGHT * 1.0
+        const landThickness = 12
+
+        const landCols: IsoFaceColors = {
+          top: 0x4caf50, // Grass Green base
+          left: 0x388e3c,
+          right: 0x2e7d32,
+          stroke: 0x66bb6a
+        }
+
+        // Special color for sites
+        if (isSite) {
+          const uiColor = getTileColor(tile.type)
+          landCols.top = lighten(uiColor, 0.2) // Lighter platform
+          landCols.left = darken(uiColor, 0.2)
+          landCols.right = darken(uiColor, 0.1)
+          landCols.stroke = lighten(uiColor, 0.4)
+        }
+
+        const landBase = createIsoPrism(landWidth, landHeight, landThickness, landCols, 'down')
+        // Adjust landBase Y so its top surface aligns roughly with road or slightly above
+        // Road top is at roughly (0, -roadHeight/2).
+        // We want land to be "ground level".
+        landBase.y = landThickness
+        propertyContainer.addChild(landBase)
+
+        // B. Building / Facility
+        if (isProperty && tile.propertyData) {
           const { level, ownerId, region } = tile.propertyData
-
-          // Visual size
           const bScale = tile.propertyData.visualScale || 1
-          const bWidth = TILE_WIDTH * 1.2 * bScale
-          const bHeight = TILE_HEIGHT * 1.2 * bScale
+          const bWidth = TILE_WIDTH * 0.7 * bScale
+          const bHeight = TILE_HEIGHT * 0.7 * bScale
+          const bThickness = 20 + level * 15
 
-          // Offset Calculation based on buildingDirection or side
-          let bx = 0
-          let by = 0
-          const OFFSET_DIST = 55 // Distance from road center
-
-          if (config.buildingDirection) {
-            // Isometric Direction mapping
-            switch (config.buildingDirection) {
-              case 'up':
-                // Grid Up -> Screen Up-Right
-                bx = OFFSET_DIST
-                by = -OFFSET_DIST * 0.6
-                break
-              case 'right':
-                // Grid Right -> Screen Down-Right
-                bx = OFFSET_DIST
-                by = OFFSET_DIST * 0.6
-                break
-              case 'down':
-                // Grid Down -> Screen Down-Left
-                bx = -OFFSET_DIST
-                by = OFFSET_DIST * 0.6
-                break
-              case 'left':
-                // Grid Left -> Screen Up-Left
-                bx = -OFFSET_DIST
-                by = -OFFSET_DIST * 0.6
-                break
-            }
-          } else if (config.buildingSide === 'inner') {
-            // Legacy fallbacks
-            bx = 0
-            by = -20
-          } else {
-            // Legacy Outer
-            const offsetDist = 60
-            by = -offsetDist
-          }
-
-          // Correction for Iso
           const regionColor = getRegionColor(region)
-
-          // Owner color
-          const ownerIndex = ownerId ? players.findIndex(p => p.id === ownerId) : -1
-          const ownerColor = ownerIndex >= 0 ? getPlayerColor(ownerIndex) : 0xaaaaaa
-
-          // Draw Building
           const bCols: IsoFaceColors = {
             top: lighten(regionColor, 0.2),
             left: darken(regionColor, 0.2),
             right: darken(regionColor, 0.1),
             stroke: 0xffffff
           }
-          const house = createIsoPrism(bWidth, bHeight, 20 + level * 15, bCols, 'up')
 
-          // Shift building position
-          house.x = bx
-          house.y = by
+          const house = createIsoPrism(bWidth, bHeight, bThickness, bCols, 'up')
+          house.y = -5 // Sit on top of land
+          propertyContainer.addChild(house)
 
-          // Add to tile
-          tileContainer.addChild(house)
-
-          // Owner Flag
+          // Owner Flag / Indicator
           if (ownerId) {
-            const flag = new PIXI.Graphics()
-            flag.beginFill(ownerColor)
-            flag.drawCircle(bx, by - 40 - level * 10, 5)
-            tileContainer.addChild(flag)
+            const ownerIndex = players.findIndex(p => p.id === ownerId)
+            if (ownerIndex >= 0) {
+              const ownerColor = getPlayerColor(ownerIndex)
+              const flag = new PIXI.Graphics()
+              flag.beginFill(ownerColor)
+              flag.drawCircle(0, -bThickness - 20, 6)
+              flag.endFill()
+              flag.lineStyle(1, 0xffffff)
+              flag.moveTo(0, -bThickness)
+              flag.lineTo(0, -bThickness - 20)
+              propertyContainer.addChild(flag)
+            }
           }
+
+          // Label (Price/Level or Name)
+          // Only show name if space allows, or level
+          // For properties, maybe just show nothing or level?
+          // User wants "Location names ... in the road adjacent land"
+          // Let's show the name on the land base if space
+          const propName = new PIXI.Text(tile.name, {
+            fontSize: 10,
+            fill: 0xffffff,
+            fontWeight: 'bold',
+            stroke: 0x000000,
+            strokeThickness: 2
+          })
+          propName.anchor.set(0.5)
+          propName.y = 15 // Front of the building
+          propertyContainer.addChild(propName)
+
+        } else if (isSite) {
+          // Site Building (Larger)
+          const siteWidth = landWidth * 0.7
+          const siteHeight = landHeight * 0.7
+          const siteThickness = 40
+
+          const uiColor = getTileColor(tile.type)
+          const sCols: IsoFaceColors = {
+            top: uiColor,
+            left: darken(uiColor, 0.3),
+            right: darken(uiColor, 0.15),
+            stroke: lighten(uiColor, 0.4)
+          }
+
+          const siteBldg = createIsoPrism(siteWidth, siteHeight, siteThickness, sCols, 'up')
+          siteBldg.y = -5
+          propertyContainer.addChild(siteBldg)
+
+          // Label
+          const label = new PIXI.Text(tile.name, {
+            fontSize: 14,
+            fontFamily: 'Arial',
+            fontWeight: 'bold',
+            fill: 'white',
+            stroke: 0x000000,
+            strokeThickness: 4
+          })
+          label.anchor.set(0.5)
+          label.y = -siteThickness - 10
+          propertyContainer.addChild(label)
         }
+
+        tilesContainer.addChild(propertyContainer)
       }
-      // ===========================
-      // 3. Render Large Site (Bank/Shop)
-      // ===========================
-      else if (config.style === 'site') {
-        // ===========================
-        // Special Site: Road + Large Adjacent Building
-        // ===========================
 
-        // 1. Render Base Road (Same as regular road for continuity)
-        const roadWidth = TILE_WIDTH * 0.8
-        const roadHeight = TILE_HEIGHT * 0.8
-        const roadThickness = 8
-        const roadColors: IsoFaceColors = {
-          top: 0x5a6d8a,
-          left: 0x3e4c63,
-          right: 0x475670,
-          stroke: 0x6b7f9e
-        }
-        const roadPrism = createIsoPrism(roadWidth, roadHeight, roadThickness, roadColors, 'down')
-        tileContainer.addChild(roadPrism)
-        tileContainer.x = posX
-        tileContainer.y = posY
+      // If it's a plain road (no property attached), do we show the name?
+      // User said: "地点的名字不应该写在道路上，而是在道路旁边的土地本身"
+      // If there is NO land (just a road tile), maybe we don't show the name, or we show a small signpost?
+      // For now, if renderConfig.style is just 'road' (and not Start/Site), we skip name on road.
+      // But we might need a small signpost for "Start"?
+      if (tile.type === TileType.Start) {
+        // Start usually has a structure too
+        const startContainer = new PIXI.Container()
+        startContainer.x = posX
+        startContainer.y = posY
+        startContainer.zIndex = posY
 
-        // 2. Render Large Building Offset
-        const siteScale = config.modelScale || 1.4
-        const siteWidth = TILE_WIDTH * siteScale
-        const siteHeight = TILE_HEIGHT * siteScale
-        const siteThickness = 15
-
-        // Calculate Offset (Same logic as properties)
-        let bx = 0
-        let by = 0
-        const OFFSET_DIST = 60 // Slightly further for larger sites
-
-        if (config.buildingDirection) {
-          switch (config.buildingDirection) {
-            case 'up':
-              bx = OFFSET_DIST
-              by = -OFFSET_DIST * 0.6
-              break
-            case 'right':
-              bx = OFFSET_DIST
-              by = OFFSET_DIST * 0.6
-              break
-            case 'down':
-              bx = -OFFSET_DIST
-              by = OFFSET_DIST * 0.6
-              break
-            case 'left':
-              bx = -OFFSET_DIST
-              by = -OFFSET_DIST * 0.6
-              break
-          }
-        }
-
-        const uiColor = getTileColor(tile.type)
-        const cols: IsoFaceColors = {
-          top: uiColor,
-          left: darken(uiColor, 0.3),
-          right: darken(uiColor, 0.15),
-          stroke: lighten(uiColor, 0.4)
-        }
-
-        const sitePrism = createIsoPrism(siteWidth, siteHeight, siteThickness, cols, 'up') // 'up' for building
-        sitePrism.x = bx
-        sitePrism.y = by
-
-        tileContainer.addChild(sitePrism)
-
-        // Label
-        const label = new PIXI.Text(tile.name, {
-          fontSize: 14,
-          fontFamily: 'Arial',
+        // Simple "Start" Arch or floating text
+        const label = new PIXI.Text("START", {
+          fontSize: 16,
           fontWeight: 'bold',
-          fill: 'white',
+          fill: 0xffff00,
           stroke: 0x000000,
           strokeThickness: 3
         })
         label.anchor.set(0.5)
-        label.y = -siteHeight * 0.6 // Adjust label to float above building
-        sitePrism.addChild(label) // Attach to building
+        label.y = -40
+        startContainer.addChild(label)
+        tilesContainer.addChild(startContainer)
       }
-
-      tilesContainer.addChild(tileContainer)
     })
   }, [tiles, players, turnState])
 
@@ -557,42 +591,83 @@ export function Board() {
 
       const color = getPlayerColor(index)
 
+      // Shadow
       const shadow = new PIXI.Graphics()
       shadow.beginFill(0x000000, 0.2)
-      shadow.drawEllipse(0, 8, PLAYER_SIZE * 0.5, PLAYER_SIZE * 0.25)
+      shadow.drawEllipse(0, 0, PLAYER_SIZE * 0.5, PLAYER_SIZE * 0.25)
       shadow.endFill()
       shadow.filters = [new PIXI.filters.BlurFilter(2)]
       sprite.addChild(shadow)
 
-      const token = new PIXI.Graphics()
-      token.beginFill(color, 0.95)
-      token.lineStyle(2, 0xffffff, 0.85)
-      token.drawEllipse(0, -PLAYER_SIZE * 0.2, PLAYER_SIZE * 0.5, PLAYER_SIZE * 0.35)
-      token.endFill()
-      sprite.addChild(token)
+      // Character Pawn (Pseudo-3D)
+      const pawn = new PIXI.Container()
 
-      const gloss = new PIXI.Graphics()
-      gloss.beginFill(0xffffff, 0.3)
-      gloss.drawEllipse(-PLAYER_SIZE * 0.12, -PLAYER_SIZE * 0.35, PLAYER_SIZE * 0.18, PLAYER_SIZE * 0.12)
-      gloss.endFill()
-      sprite.addChild(gloss)
+      // 1. Body
+      const bodyWidth = 16
+      const bodyHeight = 16
+      const bodyDepth = 18
+      const bodyCols: IsoFaceColors = {
+        top: lighten(color, 0.1),
+        left: darken(color, 0.1),
+        right: darken(color, 0.2),
+        stroke: darken(color, 0.3)
+      }
+      const body = createIsoPrism(bodyWidth, bodyHeight, bodyDepth, bodyCols, 'up')
+      body.y = -5 // Lift slightly
+      pawn.addChild(body)
 
+      // 2. Head
+      const headSize = 12
+      const headDepth = 12
+      const skinColor = 0xffccaa // Generic skin tone
+      const headCols: IsoFaceColors = {
+        top: lighten(skinColor, 0.1),
+        left: darken(skinColor, 0.05),
+        right: darken(skinColor, 0.1),
+        stroke: darken(skinColor, 0.2)
+      }
+      const head = createIsoPrism(headSize, headSize, headDepth, headCols, 'up')
+      head.y = -bodyDepth - 5 // Sit on top of body
+      pawn.addChild(head)
+
+      // 3. Simple Face (Eyes) - Direction hint
+      // Assuming facing "down-right" or "down-left" usually
+      const eye = new PIXI.Graphics()
+      eye.beginFill(0x000000, 0.7)
+      eye.drawCircle(3, -bodyDepth - 5 - 5, 1.5) // Right eye
+      eye.drawCircle(-1, -bodyDepth - 5 - 4, 1.5) // Left eye
+      eye.endFill()
+      // Adjust eye position to match isometric "front" face roughly
+      // Prisms are drawn with top/left/right faces.
+      // Front is arguably the edge between left and right.
+      pawn.addChild(eye)
+
+      // 4. Number Badge (Floating above or on body)
+      // Let's put it on the body front or floating high
       const numberText = new PIXI.Text(`${index + 1}`, {
-        fontSize: 12,
+        fontSize: 10,
         fill: 0xffffff,
         fontWeight: 'bold',
+        stroke: 0x000000,
+        strokeThickness: 2
       })
       numberText.anchor.set(0.5)
-      numberText.y = -PLAYER_SIZE * 0.28
-      sprite.addChild(numberText)
+      numberText.y = -35 // Above head
+      pawn.addChild(numberText)
 
+      // Active player highlight ring
       if (index === currentPlayerIndex) {
-        const ring = new PIXI.Graphics()
-        ring.lineStyle(2, color, 0.7)
-        ring.drawEllipse(0, 8, PLAYER_SIZE * 0.7, PLAYER_SIZE * 0.32)
-        sprite.addChildAt(ring, 1)
+        // Animate or just show a marker
+        const marker = new PIXI.Graphics()
+        marker.beginFill(0xffffff, 0.0) // Transparent fill
+        marker.lineStyle(2, 0xffff00, 0.8)
+        // Draw ring around base
+        marker.drawEllipse(0, 0, 18, 10)
+        marker.y = 0
+        sprite.addChildAt(marker, 0) // Below pawn, above shadow
       }
 
+      sprite.addChild(pawn)
       const anchor = getPlayerAnchor(player.currentTileIndex, index)
       sprite.x = anchor.x
       sprite.y = anchor.y
