@@ -38,6 +38,7 @@ function App() {
               ▶
             </button>
           )}
+          {/* AI Toggle removed from here, already in main menu */}
         </div>
       </div>
 
@@ -97,7 +98,10 @@ const styles: Record<string, React.CSSProperties> = {
   },
   boardLayer: {
     position: 'absolute',
-    inset: 0,
+    top: 0,
+    left: 0,
+    bottom: 0,
+    right: '280px', // Reserve space for the sidebar
     zIndex: 0,
   },
   uiLayer: {

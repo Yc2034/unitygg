@@ -134,8 +134,9 @@ export function Board() {
   const entitiesContainerRef = useRef<PIXI.Container | null>(null)
   const backgroundContainerRef = useRef<PIXI.Container | null>(null)
   const cameraContainerRef = useRef<PIXI.Container | null>(null)
-  const cameraTargetRef = useRef({ x: BOARD_WIDTH / 2, y: BOARD_HEIGHT / 2, zoom: CAMERA_IDLE_ZOOM })
-  const boardCenterRef = useRef({ x: BOARD_WIDTH / 2, y: BOARD_HEIGHT / 2 })
+  // Center camera initially (will be updated)
+  const cameraTargetRef = useRef({ x: 0, y: 0, zoom: CAMERA_IDLE_ZOOM })
+  const boardCenterRef = useRef({ x: 0, y: 0 })
   const isInitializedRef = useRef(false)
 
   const tiles = useGameStore((state) => state.tiles)
@@ -157,8 +158,7 @@ export function Board() {
     isInitializedRef.current = true
 
     const app = new PIXI.Application({
-      width: BOARD_WIDTH,
-      height: BOARD_HEIGHT,
+      resizeTo: containerRef.current, // Auto-resize to fill the container div
       backgroundColor: 0x131826,
       antialias: true,
       resolution: window.devicePixelRatio || 1,
@@ -169,8 +169,20 @@ export function Board() {
     appRef.current = app
 
     const cameraContainer = new PIXI.Container()
-    cameraContainer.position.set(BOARD_WIDTH / 2, BOARD_HEIGHT / 2)
-    cameraContainer.pivot.set(BOARD_WIDTH / 2, BOARD_HEIGHT / 2)
+    // Center the camera container in the screen, but shift slightly left to balance visual weight
+    const renderCenterX = app.screen.width / 2 - 40;
+    const renderCenterY = app.screen.height / 2;
+
+    cameraContainer.position.set(renderCenterX, renderCenterY)
+    // Listen to resize to keep it centered with offset
+    app.renderer.on('resize', () => {
+      const cx = app.screen.width / 2 - 40;
+      const cy = app.screen.height / 2;
+      cameraContainer.position.set(cx, cy)
+    })
+
+    // cameraContainer.pivot is where the camera "looks at"
+    cameraContainer.pivot.set(0, 0) // Reset to 0,0 initially, will be controlled by updateCamera
     cameraContainer.scale.set(CAMERA_IDLE_ZOOM)
     app.stage.addChild(cameraContainer)
     cameraContainerRef.current = cameraContainer
@@ -471,6 +483,7 @@ export function Board() {
       if (!tile) return { x: 0, y: 0 }
       const offsetX = (playerIndex % 2) * 16 - 8
       const offsetY = Math.floor(playerIndex / 2) * 12
+      // tile.position is absolute world coord
       return {
         x: tile.position.x + offsetX,
         y: tile.position.y + TILE_HEIGHT * 0.28 + offsetY,
@@ -552,10 +565,28 @@ export function Board() {
   // Camera focus
   useEffect(() => {
     if (turnState === TurnState.Moving) return
+
+    // Allow camera to focus on current player during their turn phases
+    if (
+      turnState === TurnState.WaitingForDice ||
+      turnState === TurnState.OnTile ||
+      turnState === TurnState.ChoosingDirection
+    ) {
+      const player = players[currentPlayerIndex]
+      if (player && tiles[player.currentTileIndex]) {
+        const anchor = getPlayerAnchor(player.currentTileIndex, currentPlayerIndex)
+        cameraTargetRef.current.x = anchor.x
+        cameraTargetRef.current.y = anchor.y - TILE_HEIGHT * 0.2 // Slight offset up
+        cameraTargetRef.current.zoom = CAMERA_MOVE_ZOOM // Zoom in a bit for focus
+        return
+      }
+    }
+
+    // Default to board center for other states or if no player found
     cameraTargetRef.current.x = boardCenterRef.current.x
     cameraTargetRef.current.y = boardCenterRef.current.y
     cameraTargetRef.current.zoom = CAMERA_IDLE_ZOOM
-  }, [turnState])
+  }, [turnState, currentPlayerIndex, players, tiles, getPlayerAnchor])
 
   // Handle player movement animation (步进式移动)
   const animateMovement = useCallback(
@@ -721,11 +752,11 @@ export function Board() {
     <div
       ref={containerRef}
       style={{
-        width: `${BOARD_WIDTH}px`,
-        height: `${BOARD_HEIGHT}px`,
-        borderRadius: '12px',
+        width: '100%',
+        height: '100%',
+        borderRadius: '0', // Fullscreen (or docked) doesn't need radius usually
         overflow: 'hidden',
-        boxShadow: '0 18px 40px rgba(10, 10, 20, 0.45)',
+        // boxShadow removal since it's full layer
       }}
     />
   )
