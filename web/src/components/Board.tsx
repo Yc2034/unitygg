@@ -436,10 +436,56 @@ export function Board() {
       // 3. Render Large Site (Bank/Shop)
       // ===========================
       else if (config.style === 'site') {
-        const siteScale = config.modelScale || 1.5
+        // ===========================
+        // Special Site: Road + Large Adjacent Building
+        // ===========================
+
+        // 1. Render Base Road (Same as regular road for continuity)
+        const roadWidth = TILE_WIDTH * 0.8
+        const roadHeight = TILE_HEIGHT * 0.8
+        const roadThickness = 8
+        const roadColors: IsoFaceColors = {
+          top: 0x5a6d8a,
+          left: 0x3e4c63,
+          right: 0x475670,
+          stroke: 0x6b7f9e
+        }
+        const roadPrism = createIsoPrism(roadWidth, roadHeight, roadThickness, roadColors, 'down')
+        tileContainer.addChild(roadPrism)
+        tileContainer.x = posX
+        tileContainer.y = posY
+
+        // 2. Render Large Building Offset
+        const siteScale = config.modelScale || 1.4
         const siteWidth = TILE_WIDTH * siteScale
         const siteHeight = TILE_HEIGHT * siteScale
-        const siteThickness = 12
+        const siteThickness = 15
+
+        // Calculate Offset (Same logic as properties)
+        let bx = 0
+        let by = 0
+        const OFFSET_DIST = 60 // Slightly further for larger sites
+
+        if (config.buildingDirection) {
+          switch (config.buildingDirection) {
+            case 'up':
+              bx = OFFSET_DIST
+              by = -OFFSET_DIST * 0.6
+              break
+            case 'right':
+              bx = OFFSET_DIST
+              by = OFFSET_DIST * 0.6
+              break
+            case 'down':
+              bx = -OFFSET_DIST
+              by = OFFSET_DIST * 0.6
+              break
+            case 'left':
+              bx = -OFFSET_DIST
+              by = -OFFSET_DIST * 0.6
+              break
+          }
+        }
 
         const uiColor = getTileColor(tile.type)
         const cols: IsoFaceColors = {
@@ -449,10 +495,11 @@ export function Board() {
           stroke: lighten(uiColor, 0.4)
         }
 
-        const sitePrism = createIsoPrism(siteWidth, siteHeight, siteThickness, cols, 'down')
+        const sitePrism = createIsoPrism(siteWidth, siteHeight, siteThickness, cols, 'up') // 'up' for building
+        sitePrism.x = bx
+        sitePrism.y = by
+
         tileContainer.addChild(sitePrism)
-        tileContainer.x = posX
-        tileContainer.y = posY
 
         // Label
         const label = new PIXI.Text(tile.name, {
@@ -464,8 +511,8 @@ export function Board() {
           strokeThickness: 3
         })
         label.anchor.set(0.5)
-        label.y = -siteHeight * 0.5
-        tileContainer.addChild(label)
+        label.y = -siteHeight * 0.6 // Adjust label to float above building
+        sitePrism.addChild(label) // Attach to building
       }
 
       tilesContainer.addChild(tileContainer)
